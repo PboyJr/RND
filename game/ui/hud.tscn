@@ -1,0 +1,86 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/Hud.cs" id="1_hud"]
+
+[node name="Hud" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_hud")
+
+[node name="Crosshair" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -2.0
+offset_top = -2.0
+offset_right = 2.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0.8)
+
+[node name="Hint" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -320.0
+offset_top = -90.0
+offset_right = 320.0
+offset_bottom = -60.0
+grow_horizontal = 2
+grow_vertical = 0
+horizontal_alignment = 1
+
+[node name="Status" type="Label" parent="."]
+modulate = Color(1, 1, 1, 0.6)
+layout_mode = 0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 416.0
+offset_bottom = 38.0
+
+[node name="PauseMenu" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -130.0
+offset_top = -80.0
+offset_right = 130.0
+offset_bottom = 80.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="PauseMenu"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="PauseMenu/VBox"]
+layout_mode = 2
+text = "Paused (game keeps running)"
+horizontal_alignment = 1
+
+[node name="Resume" type="Button" parent="PauseMenu/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Resume"
+
+[node name="Leave" type="Button" parent="PauseMenu/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Leave session"

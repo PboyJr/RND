@@ -1,0 +1,188 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://levels/Level.cs" id="1_level"]
+[ext_resource type="PackedScene" path="res://players/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://props/crate.tscn" id="3_crate"]
+[ext_resource type="PackedScene" path="res://props/crate_large.tscn" id="4_crate_large"]
+[ext_resource type="PackedScene" path="res://props/specimen_jar.tscn" id="5_jar"]
+
+[sub_resource type="Environment" id="Environment_facility"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.025, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.5, 0.55, 1)
+ambient_light_energy = 0.2
+tonemap_mode = 2
+ssao_enabled = true
+glow_enabled = true
+fog_enabled = true
+fog_light_color = Color(0.04, 0.045, 0.05, 1)
+fog_density = 0.04
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_floor"]
+albedo_color = Color(0.25, 0.26, 0.27, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_concrete"]
+albedo_color = Color(0.42, 0.43, 0.45, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_metal"]
+albedo_color = Color(0.3, 0.32, 0.35, 1)
+metallic = 0.7
+roughness = 0.45
+
+[node name="TestLevel" type="Node3D"]
+script = ExtResource("1_level")
+PlayerScene = ExtResource("2_player")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_facility")
+
+[node name="Geometry" type="Node3D" parent="."]
+
+[node name="Floor" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+use_collision = true
+size = Vector3(25, 1, 25)
+material = SubResource("StandardMaterial3D_floor")
+
+[node name="Ceiling" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.25, 0)
+use_collision = true
+size = Vector3(25, 0.5, 25)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="WallNorth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -12.25)
+use_collision = true
+size = Vector3(25, 4, 0.5)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="WallSouth" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 12.25)
+use_collision = true
+size = Vector3(25, 4, 0.5)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="WallEast" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.25, 2, 0)
+use_collision = true
+size = Vector3(0.5, 4, 25)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="WallWest" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.25, 2, 0)
+use_collision = true
+size = Vector3(0.5, 4, 25)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="Pillar" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -2)
+use_collision = true
+size = Vector3(0.8, 4, 0.8)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="Platform" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.5, -6)
+use_collision = true
+size = Vector3(4, 1, 4)
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="Ramp" type="CSGPolygon3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -6)
+use_collision = true
+polygon = PackedVector2Array(0, 0, 0, 1, 3, 0)
+depth = 2.0
+material = SubResource("StandardMaterial3D_concrete")
+
+[node name="Table" type="CSGBox3D" parent="Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.45, -6)
+use_collision = true
+size = Vector3(2.4, 0.9, 1.2)
+material = SubResource("StandardMaterial3D_metal")
+
+[node name="Lights" type="Node3D" parent="."]
+
+[node name="LampNW" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 3.6, -6)
+light_color = Color(1, 0.85, 0.65, 1)
+light_energy = 1.4
+shadow_enabled = true
+omni_range = 10.0
+
+[node name="LampNE" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 3.6, -6)
+light_color = Color(1, 0.85, 0.65, 1)
+light_energy = 1.4
+shadow_enabled = true
+omni_range = 10.0
+
+[node name="LampSW" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 3.6, 6)
+light_color = Color(0.6, 0.8, 1, 1)
+light_energy = 1.2
+shadow_enabled = true
+omni_range = 10.0
+
+[node name="LampSE" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 3.6, 6)
+light_color = Color(1, 0.85, 0.65, 1)
+light_energy = 1.4
+shadow_enabled = true
+omni_range = 10.0
+
+[node name="Props" type="Node3D" parent="."]
+
+[node name="CrateA" parent="Props" instance=ExtResource("3_crate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.3, -3)
+
+[node name="CrateB" parent="Props" instance=ExtResource("3_crate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.7, 0.3, -3)
+
+[node name="CrateC" parent="Props" instance=ExtResource("3_crate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.35, 0.905, -3)
+
+[node name="CrateD" parent="Props" instance=ExtResource("3_crate")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.3, 1)
+
+[node name="CaseA" parent="Props" instance=ExtResource("4_crate_large")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 0.5, 3)
+
+[node name="JarA" parent="Props" instance=ExtResource("5_jar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.175, 3)
+
+[node name="JarB" parent="Props" instance=ExtResource("5_jar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.175, 3.4)
+
+[node name="JarC" parent="Props" instance=ExtResource("5_jar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.5, 1.175, -6.5)
+
+[node name="JarD" parent="Props" instance=ExtResource("5_jar")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.075, -6)
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://players/player.tscn")
+spawn_path = NodePath("../Players")
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 8)
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.05, 8)
+
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.05, 8)
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.05, 8)
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.05, 8)
+
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 9.5)

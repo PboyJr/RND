@@ -1,0 +1,22 @@
+﻿# Godot
+.godot/
+android/
+
+# .NET
+.mono/
+bin/
+obj/
+*.user
+*.csproj.old
+# Machine-specific (points at your local Godot install)
+**/Properties/launchSettings.json
+mono_crash.*.json
+
+# Exported builds
+builds/
+
+# Editors / OS
+.vs/
+.idea/
+Thumbs.db
+.DS_Store
