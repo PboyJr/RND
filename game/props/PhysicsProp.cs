@@ -1,5 +1,6 @@
 using Godot;
 using RND.Core;
+using RND.Levels;
 using RND.Players;
 
 namespace RND.Props;
@@ -29,6 +30,11 @@ public partial class PhysicsProp : RigidBody3D
 	// Dropped if it lags this far behind the hold point (e.g. snagged on a doorframe).
 	[Export] public float BreakDistance { get; set; } = 3f;
 
+	[ExportGroup("Noise")]
+	// Losing at least this much speed in one step counts as a crash that enemies can hear.
+	// Louder the harder and heavier it hits.
+	[Export] public float ImpactNoiseSpeed { get; set; } = 2.5f;
+
 	// Written by the host, replicated to clients by the MultiplayerSynchronizer.
 	[ExportGroup("Network")]
 	[Export] public Vector3 SyncPosition { get; set; }
@@ -43,6 +49,8 @@ public partial class PhysicsProp : RigidBody3D
 	}
 
 	private int _heldBy;
+	private float _lastSpeed;
+	private float _noiseCooldown;
 
 	public override void _Ready()
 	{
@@ -67,8 +75,25 @@ public partial class PhysicsProp : RigidBody3D
 		if (HeldBy != 0 && !(Player.TryGet(HeldBy, out Player holder) && holder.HoldPoint.DistanceTo(GlobalPosition) < BreakDistance))
 			HeldBy = 0;
 
+		MakeImpactNoise((float)delta);
 		SyncPosition = GlobalPosition;
 		SyncRotation = GlobalBasis.GetRotationQuaternion();
+	}
+
+	// A sudden loss of speed means it hit something. Speeding up (being thrown) is silent, and so is
+	// being carried.
+	private void MakeImpactNoise(float delta)
+	{
+		float speed = LinearVelocity.Length();
+		float lost = _lastSpeed - speed;
+		_lastSpeed = speed;
+		_noiseCooldown -= delta;
+
+		if (HeldBy != 0 || lost < ImpactNoiseSpeed || _noiseCooldown > 0f)
+			return;
+
+		_noiseCooldown = 0.3f;
+		Level.Current?.EmitNoise(GlobalPosition, Mathf.Clamp(lost * 2f * Mathf.Sqrt(Mass / 4f), 3f, 18f));
 	}
 
 	public override void _IntegrateForces(PhysicsDirectBodyState3D state)

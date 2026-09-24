@@ -35,6 +35,20 @@ Goal: the first archetype (the Scientist) can fight the first entity (the evil g
 - [x] Health for players and the evil guy, controlled by the host: hit flashes, HUD health bar,
       damage flash, death and respawn
 - [x] Smoke tests cover combat offline and over a real host / client connection
+- [x] Fix: evil guy now finds its way up ramps and onto platforms instead of getting stuck at edges
+- [x] Fix: point-blank beakers no longer pass through an enemy standing against you
+
+### M3: Enemy AI v2 ✅ (2026-09-24)
+
+Goal: the evil guy acts on what it perceives, not what the code knows.
+
+- [x] Vision cone + close-range sense, gradual noticing (suspicion meter)
+- [x] Hearing via `Level.EmitNoise`: footsteps (sprint loud, walk quiet), beaker shatters, prop crashes
+- [x] Last-known-position + heading, then area search, then give up
+- [x] Mood shown in its eyes (calm / suspicious / hunting / about to swing)
+- [x] Auto-generated drop-down links off ledges
+- [x] Shoves props out of its way; sidesteps and re-plans when wedged
+- [x] Smoke checks for every behaviour above
 
 ---
 
@@ -53,6 +67,8 @@ Goal: the first archetype (the Scientist) can fight the first entity (the evil g
 
 Rough order, and likely to change:
 
+- **Enemy AI v3:** learns your habits, reacts to light, crouch-sneaking, several enemies sharing
+  what they notice, lure-with-noise play (see DESIGN)
 - **More archetypes + kits** (the hotbar and item system are ready for them)
 - **More entity types** (the evil guy is v1)
 - **Evidence types:** beyond physical props (photos, recordings, readings?)

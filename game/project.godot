@@ -119,6 +119,10 @@ hotbar_5={
 3d_physics/layer_3="Props"
 3d_physics/layer_4="Entities"
 
+[navigation]
+
+3d/default_cell_height=0.05
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

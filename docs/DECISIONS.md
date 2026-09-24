@@ -176,14 +176,81 @@ LAN). Client-side prediction can come later if it feels laggy over the internet.
 - Enemies are **spawned by `EnemySpawner`**, not placed in the level, so a dead enemy despawns on
   every client.
 - **Navigation:** `NavigationRegion3D` (the level geometry is its child) is **baked at runtime on
-  the host only**, one frame after load, since CSG geometry doesn't exist before that. If there's
-  no path yet, the AI walks straight at its target.
+  the host only**, one frame after load, since CSG geometry doesn't exist before that.
+
+## 2026-09-24: Enemy pathfinding rules (fix for "stuck at the platform edge")
+
+**Decision:**
+- **The navmesh must match what bodies can physically do.** Characters are capsules with no
+  step-up, and a 0.45 m capsule rolls over roughly 0.13 m at most. So the navmesh uses
+  `agent_max_climb = 0.1` with `cell_height = 0.05`. Fine height cells keep ramps connected even
+  with a small climb. The matching project setting is `navigation/3d/default_cell_height = 0.05`,
+  since the map and navmesh cell heights must agree. The old 0.25 m climb connected ramp *sides*
+  to the floor, so paths ran into walls.
+- **Target the surface the player is on**, not the nearest navmesh point. We probe a vertical
+  segment through their feet (`MapGetClosestPointToSegment`), which picks the platform top over
+  the floor beside it.
+- **Never beeline.** The AI only follows navmesh paths. No path (still baking, or unreachable)
+  means it stands still and faces the target.
+- **Attacks need the target on roughly the same level** (`AttackHeightTolerance`, 0.75 m), so it
+  doesn't camp under ledges swinging upward instead of walking round.
+
+**How we verified it:** a headless probe put the evil guy on the floor and a player at five spots
+on the platform. Before: 4 of 5 stuck. After: 5 of 5 reached, repeatably. The hardest case is now
+in the smoke test.
+
+**Rule for future levels:** when characters get new movement abilities (step-up, jumping,
+vaulting), update `agent_max_climb` and add navigation links to match, or paths will lie.
+
+## 2026-09-24: Thrown items launch from the eyes
+
+**Decision:** projectiles spawn exactly at the thrower's eye position (the mesh stays hidden for
+the first 0.03 s so it doesn't flash through the camera). They used to spawn 0.4 m ahead, which put
+them *inside* an enemy standing against you (or past a wall you were hugging). A ray that starts
+inside a shape doesn't hit it, so the beaker flew straight through. Players aren't in the
+projectile's hit mask, so launching from inside the thrower is safe.
 
 ## 2026-09-24: Input actions and layers
 
 - LMB / RMB are `primary` / `secondary`: what they do depends on the selected hotbar slot.
   Scroll is `scroll_up` / `scroll_down`. Keys 1–5 are `hotbar_1..5`.
 - Physics layer 4 = **Entities** (enemies). Bits are in `core/Layers.cs`.
+
+## 2026-09-24: Enemy AI v2: perception, memory, noise, drop links
+
+**Decision:**
+- **Perception replaces omniscience.** The enemy tracks a player's real position only while it
+  can see them (LOS, focused). After `LoseSightGrace` (0.75 s) out of sight it switches to
+  **Search** at the last seen position plus velocity × `PredictSeconds`, a snapshot and never
+  live. Acquiring a target needs the **vision cone** (or `CloseSenseRange`) and builds a
+  **suspicion** meter over time (`NoticeTimeNear`/`Far`); ≥ 0.35 investigates, 1.0 hunts.
+- **Noise is one host-side call: `Level.EmitNoise(position, radius)`.** Each enemy
+  decides in `Enemy.Hear` whether it heard it (walls halve the radius) and whether to investigate.
+  Anything that makes sound should call it:
+  - **Footsteps:** worked out on the host from how far each player actually moved (so remote
+    players need no extra RPC, and a blocked player is silent). Teleports (> 20 m/s) are ignored.
+  - **Beaker shatter:** `SplashProjectile.ShatterNoiseRadius`.
+  - **Prop crashes:** a sudden *loss* of speed (being thrown or carried is silent).
+- **Mood is replicated** (`Enemy.Mood`: Calm / Suspicious / Hunting) purely so every client can
+  show it in the eyes. Readable AI is fair AI.
+- **Drop-down links are generated, not placed.** `DropLinks.Generate` runs when the navmesh
+  finishes baking. It walks the navmesh outline, probes past each edge for a 0.4–3 m drop onto
+  walkable ground (no wall in the way), and adds a one-way `NavigationLink3D`. Any level, hand-made
+  or procedural, gets them for free. The agent just walks the link and gravity does the rest.
+- **Props:** the enemy **shoves** whatever it bumps (force at the contact point, so things tip and
+  tumble) rather than planning around them. Cheaper than re-baking the navmesh as props move, and
+  it creates noise and chaos.
+- **Stuck recovery:** if it's pushing but moving under 25% of the intended speed for 0.75 s, it
+  sidesteps for 0.5 s and re-plans.
+- **Chasing re-plans every 0.25 s, not every frame, and that's load-bearing.** Stepping off a ledge
+  puts it just off the navmesh, so a fresh plan starts from the nearest navmesh point *behind* it
+  and says "go back". Re-planning every frame left it wobbling at the lip forever. A simplification
+  pass removed the throttle and the drop-link smoke check caught it.
+
+**How we verified it:** offline smoke checks cover each behaviour on a fresh enemy: blind behind,
+sees in front; searches the last seen spot, not the true one; gives up; ignores far noise and
+investigates loud noise; can't hear walking but can hear sprinting; drops off the platform; shoves
+a crate. They pass 5/5 offline and 5/5 over the network.
 
 ---
 
@@ -206,4 +273,14 @@ Things the prototype does on purpose that we'll need to revisit:
   collision shapes (the navmesh already only reads colliders on the World layer).
 - The death "pose" is a placeholder (the capsule tips over), and respawn is a fixed 8 s timer.
 - Only one enemy type. It ignores thrown props, sound and light.
+- The enemy can drop down but never jump up. Drop links are one-way, and the only way up is a real
+  ramp or stairs.
+- Drop links are generated once per bake. Anything that changes the level at runtime (a door, a
+  collapsing floor) will need a re-bake plus fresh links.
+- It doesn't plan around props, it just shoves them. A pile of heavy cases can still slow it down,
+  though stuck recovery stops it wedging forever.
+- The navmesh has walkable islands on the tabletop (unreachable, harmless) and gets drop links off
+  it.
+- Noise carries no source, only a position and a radius. Hearing a crash sends it to the crash,
+  not to whoever threw the crate. Add a source back if AI ever needs to tell noises apart.
 - The thrower's own beaker appears after a network round trip (no client-side prediction).

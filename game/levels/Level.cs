@@ -1,4 +1,5 @@
 using Godot;
+using RND.Combat;
 using RND.Enemies;
 using RND.Items;
 using RND.Players;
@@ -48,6 +49,7 @@ public partial class Level : Node3D
 		// Only the host runs AI, so only the host needs a navmesh. Deferred because CSG geometry only
 		// builds its meshes at the end of the frame; baking now would find nothing to walk on.
 		var navigation = GetNode<NavigationRegion3D>("Navigation");
+		navigation.BakeFinished += () => DropLinks.Generate(navigation);
 		Callable.From(() => navigation.BakeNavigationMesh()).CallDeferred();
 
 		foreach (Node point in GetTree().GetNodesInGroup("enemy_spawn"))
@@ -65,6 +67,19 @@ public partial class Level : Node3D
 		_spawningPlayers = false;
 		Multiplayer.PeerConnected -= OnPeerConnected;
 		Multiplayer.PeerDisconnected -= OnPeerDisconnected;
+	}
+
+	/// <summary>
+	/// Host only. Something made a sound: every enemy within earshot decides for itself whether it
+	/// heard it (walls muffle) and whether to come and look.
+	/// </summary>
+	public void EmitNoise(Vector3 position, float radius)
+	{
+		if (!Multiplayer.IsServer())
+			return;
+
+		foreach (Node child in _enemies.GetChildren())
+			(child as Enemy)?.Hear(position, radius);
 	}
 
 	/// <summary>Host only. The ProjectileSpawner must list the projectile's scene.</summary>
@@ -98,7 +113,7 @@ public partial class Level : Node3D
 		enemy.Rotation = new Vector3(0, point.GlobalRotation.Y, 0);
 		enemy.SyncPosition = enemy.Position;
 		enemy.SyncYaw = enemy.Rotation.Y;
-		enemy.Defeated += () => RespawnEnemyLater(point);
+		enemy.GetNode<Health>("Health").Died += _ => RespawnEnemyLater(point);
 		_enemies.AddChild(enemy, forceReadableName: true);
 	}
 

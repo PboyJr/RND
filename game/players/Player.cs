@@ -44,6 +44,10 @@ public partial class Player : CharacterBody3D
 	[Export] public float AirAcceleration { get; set; } = 2f;
 	[Export] public float MouseSensitivity { get; set; } = 0.0025f;
 
+	// How far away enemies can hear your footsteps (walls halve it).
+	[Export] public float WalkNoiseRadius { get; set; } = 3f;
+	[Export] public float SprintNoiseRadius { get; set; } = 10f;
+
 	[ExportGroup("Carrying")]
 	[Export] public float GrabRange { get; set; } = 2.5f;
 	[Export] public float MinHoldDistance { get; set; } = 1f;
@@ -115,6 +119,8 @@ public partial class Player : CharacterBody3D
 	private Tween _flashTween;
 	private PhysicsProp _heldProp;
 	private float _gravity;
+	private Vector3 _lastFootstepPosition;
+	private float _footstepTimer;
 
 	// Per-slot "ready again at" times. The owner uses theirs for the HUD; the host keeps its own to validate throws.
 	private readonly double[] _readyAt = new double[MaxSlots];
@@ -231,24 +237,45 @@ public partial class Player : CharacterBody3D
 	{
 		float dt = (float)delta;
 
-		if (!IsMultiplayerAuthority())
+		if (IsMultiplayerAuthority())
+		{
+			Move(dt);
+
+			if (SelectedSlot == HandsSlot)
+				UpdateCarrying();
+			else
+				UpdateItemUse();
+			SelectedItemReady = GetCooldownRemaining(SelectedSlot) <= 0f;
+
+			if (GlobalPosition.Y < KillPlaneY)
+				MoveToSpawnPoint();
+
+			WriteSyncState();
+		}
+		else
 		{
 			FollowNetworkState(dt);
-			return;
 		}
 
-		Move(dt);
+		if (Multiplayer.IsServer())
+			MakeFootstepNoise(dt);
+	}
 
-		if (SelectedSlot == HandsSlot)
-			UpdateCarrying();
-		else
-			UpdateItemUse();
-		SelectedItemReady = GetCooldownRemaining(SelectedSlot) <= 0f;
+	// Host only. Judged from how far the player actually moved, so it works the same for remote
+	// players (which the host only sees as replicated positions). Walking is quiet, sprinting carries.
+	private void MakeFootstepNoise(float dt)
+	{
+		Vector3 moved = GlobalPosition - _lastFootstepPosition;
+		_lastFootstepPosition = GlobalPosition;
+		_footstepTimer -= dt;
 
-		if (GlobalPosition.Y < KillPlaneY)
-			MoveToSpawnPoint();
+		float speed = new Vector2(moved.X, moved.Z).Length() / dt;
+		if (IsDead || speed < 1f || speed > 20f || _footstepTimer > 0f) // > 20 m/s is a teleport or respawn
+			return;
 
-		WriteSyncState();
+		bool sprinting = speed > (WalkSpeed + SprintSpeed) / 2f;
+		_footstepTimer = sprinting ? 0.3f : 0.5f;
+		Level.Current?.EmitNoise(GlobalPosition, sprinting ? SprintNoiseRadius : WalkNoiseRadius);
 	}
 
 	private void Move(float dt)
@@ -309,7 +336,9 @@ public partial class Player : CharacterBody3D
 		_hostReadyAt[slot] = Now + item.Cooldown;
 		direction = direction.Normalized();
 		Vector3 velocity = direction * item.ThrowSpeed + Vector3.Up * item.ThrowLift;
-		Level.Current?.SpawnProjectile(item.Projectile, origin + direction * 0.4f, velocity, PeerId);
+		// Launch from the eyes, not in front of them: an offset start point can end up inside an enemy
+		// that's right in your face (or past a wall you're hugging), and the throw would pass through.
+		Level.Current?.SpawnProjectile(item.Projectile, origin, velocity, PeerId);
 	}
 
 	// ── Carrying ────────────────────────────────────────────────────────────────

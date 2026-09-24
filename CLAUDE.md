@@ -2,6 +2,11 @@
 
 Co-op research horror game (REPO-like) in **Godot 4.7 .NET / C#**. The Godot project is `game/`.
 
+## Guiding principle
+
+**Make everything as intelligent and dynamic as possible** (see DESIGN.md). Prefer reactive
+behaviour over scripted shortcuts, e.g. enemies always pathfind and never beeline.
+
 ## Read first
 
 - `docs/DESIGN.md`: game ideas and their status (Decided / Leaning / Idea / Open)
@@ -29,6 +34,10 @@ update the matching doc in the same turn:
 - Networking rules: transport only in `core/Network.cs`; player movement is client-authoritative;
   props, health, enemies and projectiles are host-authoritative (clients send requests via RPC).
   See DECISIONS before changing.
+- Anything that makes a sound gameplay should care about calls `Level.EmitNoise(position,
+  radius)` on the host. Enemies decide for themselves whether they heard it.
+- Enemies only act on what they perceive (sight cone, hearing, memory). Don't give AI direct
+  access to player positions it couldn't know.
 - Anything damageable gets a `Health` child (`combat/Health.cs`). New hotbar items are `.tres`
   files (`items/`), added to a player's `Loadout`. New spawnable scenes must be listed in the
   level's matching MultiplayerSpawner.

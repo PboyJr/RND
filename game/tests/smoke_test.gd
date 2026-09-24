@@ -7,7 +7,7 @@ extends Node
 ## Prints "SMOKE PASS" or "SMOKE FAIL: ..." lines and exits with 0 / 1.
 
 const PORT := 17777
-const TIMEOUT := 60.0
+const TIMEOUT := 90.0
 const SCENES := [
 	"res://core/main.tscn",
 	"res://levels/test_level.tscn",
@@ -69,6 +69,7 @@ func _run_scenes() -> void:
 		_check(prop.global_position.y > -0.5, "offline: %s fell through the floor" % prop.name)
 	if player != null:
 		await _run_offline_combat(level, player)
+		await _run_offline_ai(level, player)
 	level.queue_free()
 
 
@@ -89,9 +90,10 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 	var enemy_health := enemy.get_node("Health")
 	var player_health := player.get_node("Health")
 
-	# Throw: freeze the AI so it stands still, then lob a beaker at it from 5 m.
+	# Throw: freeze the AI, then throw from the hardest spot, bodies touching (0.8 m between centres).
+	# The beaker used to launch 0.4 m ahead of the eyes, i.e. inside the enemy, and fly straight through.
 	enemy.set_physics_process(false)
-	player.global_position = enemy.global_position + Vector3(0, 0, 5)
+	player.global_position = enemy.global_position + Vector3(0, 0, 0.8)
 	await _frames(2)
 	var eye: Vector3 = player.get_node("Head").global_position
 	var aim: Vector3 = (enemy.global_position + Vector3.UP * 1.2 - eye).normalized()
@@ -110,6 +112,18 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 	_check(await _wait_until(func(): return player_health.Current < player_health.MaxHealth, 4.0), "offline: evil guy never hurt the player")
 	_log("evil guy hit: player at %.0f / %.0f" % [player_health.Current, player_health.MaxHealth])
 
+	# Pathfinding: from the floor beside the platform, it must walk round and up the ramp to reach
+	# a player on the platform's far edge, not camp underneath swinging upward.
+	var ledge_spot := Vector3(-7.5, 1.0, -6.0)
+	player.global_position = ledge_spot
+	enemy.global_position = Vector3(-9.5, 0.0, -6.0)
+	enemy_health.TakeDamage(0.01, 1) # lock on to the player
+	var climbed := await _wait_until(func():
+		player.global_position = ledge_spot
+		var flat := Vector2(enemy.global_position.x - ledge_spot.x, enemy.global_position.z - ledge_spot.z).length()
+		return enemy.global_position.y > 0.9 and flat < 1.7, 10.0)
+	_check(climbed, "offline: evil guy couldn't find its way up to a player on the platform (ended at %s)" % enemy.global_position)
+
 	# Player death and respawn.
 	enemy.set_physics_process(false)
 	player.RespawnDelay = 0.5
@@ -124,6 +138,108 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 	_check(await _wait_until(func(): return enemies.get_child_count() == 0, 1.0), "offline: dead evil guy wasn't removed")
 	var respawned := await _wait_until(func(): return enemies.get_child_count() == 1 and enemies.get_child(0).get_instance_id() != old_id, 3.0)
 	_check(respawned, "offline: evil guy didn't respawn")
+
+
+# AI v2: senses, memory, search, drop-down links, shoving props. Each scenario gets a fresh evil guy.
+enum Mood { CALM, SUSPICIOUS, HUNTING }
+
+func _run_offline_ai(level: Node, player: Node3D) -> void:
+	var player_health := player.get_node("Health")
+	player_health.MaxHealth = 100000.0 # these scenarios are about behaviour, not surviving it
+	player_health.Revive()
+	var agent_target := func(e: Node): return (e.get_node("NavigationAgent3D") as NavigationAgent3D).target_position
+
+	# Vision cone: blind to a player standing behind it, notices them once it turns round.
+	var e := await _fresh_enemy(level)
+	e.WanderSpeed = 0.0 # stand still so the facing we set sticks
+	e.rotation = Vector3.ZERO # looking toward -Z
+	player.global_position = e.global_position + Vector3(0, 0, 6)
+	await _seconds(1.0)
+	_check(e.Mood == Mood.CALM, "vision: noticed a player standing behind it (mood %d)" % e.Mood)
+	e.rotation = Vector3(0, PI, 0)
+	_check(await _wait_until(func(): return e.Mood == Mood.HUNTING, 2.5), "vision: didn't notice a player right in front of it")
+
+	# Memory: duck behind the pillar and it goes to where it last saw us, not to where we are.
+	var last_seen := player.global_position
+	e.SearchSeconds = 2.0
+	e.SearchRadius = 2.0
+	player.global_position = Vector3(0, 0, 0.5) # the pillar at z=-2 blocks its view
+	var searching := await _wait_until(func(): return e.Mood == Mood.SUSPICIOUS, 3.0)
+	var goal: Vector3 = agent_target.call(e)
+	_check(searching and goal.distance_to(last_seen) < 1.5, "memory: after losing us it should search our last seen spot %s, went for %s" % [last_seen, goal])
+
+	# ...then gives up if it finds nothing.
+	player.global_position = Vector3(10, 0, 10) # far out of sight
+	_check(await _wait_until(func(): return e.Mood == Mood.CALM, 6.0), "search: never gave up and calmed down")
+
+	# Hearing: ignores distant noise, investigates loud noise, can't hear walking but hears sprinting.
+	e = await _fresh_enemy(level)
+	e.WanderSpeed = 0.0
+	e.rotation = Vector3.ZERO
+	level.EmitNoise(e.global_position + Vector3(8, 0, 0), 4.0)
+	await _frames(2)
+	_check(e.Mood == Mood.CALM, "hearing: reacted to a noise out of earshot")
+	var noise_at: Vector3 = e.global_position + Vector3(6, 0, 2)
+	level.EmitNoise(noise_at, 12.0)
+	await _frames(2)
+	var noise_goal: Vector3 = agent_target.call(e)
+	_check(e.Mood == Mood.SUSPICIOUS and noise_goal.distance_to(noise_at) < 1.5, "hearing: didn't come to investigate a loud noise (mood %d, heading %s)" % [e.Mood, noise_goal])
+
+	e = await _fresh_enemy(level)
+	e.WanderSpeed = 0.0
+	e.rotation = Vector3.ZERO
+	# Behind it, outside its view cone, in a lane clear of the crates at z=-3 (a player blocked by
+	# a crate isn't moving, so rightly makes no footstep noise).
+	player.global_position = e.global_position + Vector3(-3, 0, 6)
+	await _frames(2)
+	var heard_walking := await _wait_until(func():
+		player.global_position += Vector3(3.0 / 60.0, 0, 0)
+		return e.Mood != Mood.CALM, 1.5)
+	_check(not heard_walking, "hearing: heard a player merely walking 6 m behind it")
+	var heard_sprinting := await _wait_until(func():
+		player.global_position += Vector3(6.0 / 60.0, 0, 0)
+		return e.Mood != Mood.CALM, 1.5)
+	_check(heard_sprinting, "hearing: didn't hear a player sprinting 6 m behind it")
+
+	# Drop-down links: from the platform it hops straight down to us instead of using the ramp.
+	var links := level.get_node("Navigation").get_children().filter(func(n): return n is NavigationLink3D)
+	_check(links.size() > 0, "drop links: none were generated")
+	e = await _fresh_enemy(level)
+	e.global_position = Vector3(-6, 1.05, -6)
+	var below := Vector3(-9.5, 0, -6)
+	player.global_position = below
+	e.get_node("Health").TakeDamage(0.01, 1) # lock on
+	var dropped := await _wait_until(func():
+		player.global_position = below
+		return e.global_position.y < 0.5 and Vector2(e.global_position.x - below.x, e.global_position.z - below.z).length() < 1.7, 3.0)
+	_check(dropped, "drop links: took the long way round instead of dropping off the platform (at %s)" % e.global_position)
+
+	# Shoving: a crate in its way gets pushed aside.
+	e = await _fresh_enemy(level)
+	var crate := level.get_node("Props/CrateD") as RigidBody3D
+	e.global_position = Vector3(8, 0.05, -4)
+	crate.global_position = Vector3(8, 0.3, -1)
+	crate.linear_velocity = Vector3.ZERO
+	var crate_start := crate.global_position
+	player.global_position = Vector3(8, 0, 3)
+	e.get_node("Health").TakeDamage(0.01, 1)
+	var shoved := await _wait_until(func():
+		player.global_position = Vector3(8, 0, 3)
+		return crate.global_position.distance_to(crate_start) > 0.5, 4.0)
+	_check(shoved, "shove: didn't push a crate out of its way")
+	_log("AI v2: vision, memory, search, hearing, drop links (%d), shoving all behave" % links.size())
+
+
+# Kills whatever's there and waits for the level to spawn a fresh, calm evil guy.
+func _fresh_enemy(level: Node) -> Node3D:
+	var enemies := level.get_node("Enemies")
+	level.EnemyRespawnDelay = 0.2
+	for old in enemies.get_children():
+		old.get_node("Health").TakeDamage(99999.0, 0)
+	await _wait_until(func(): return enemies.get_child_count() == 0, 1.0)
+	await _wait_until(func(): return enemies.get_child_count() == 1, 2.0)
+	await _frames(2)
+	return enemies.get_child(0) as Node3D
 
 
 func _run_host() -> void:
@@ -193,7 +309,7 @@ func _run_client() -> void:
 	_check(_level() == null, "client: level not cleared after leaving")
 
 
-# The host runs the evil guy and all damage; the client throws a beaker and gets hit back.
+# The host runs the evil guy and all damage. The client gets hit, then hits back.
 func _run_network_combat(me: Node3D, head: Node3D) -> void:
 	var enemies := _level().get_node("Enemies")
 	if not _check(await _wait_until(func(): return enemies.get_child_count() > 0, 5.0), "client: evil guy never replicated"):
@@ -201,24 +317,25 @@ func _run_network_combat(me: Node3D, head: Node3D) -> void:
 	var enemy := enemies.get_child(0) as Node3D
 	var enemy_health := enemy.get_node("Health")
 	var my_health := me.get_node("Health")
-	var start_health: float = enemy_health.Current
 
-	# Stand 4 m from it, on the room-centre side so we never end up inside a wall.
-	var away := -enemy.global_position * Vector3(1, 0, 1)
-	away = away.normalized() if away.length() > 1.0 else Vector3.BACK
-	me.global_position = enemy.global_position + away * 4.0
-	await _seconds(0.3) # the host checks the throw starts near where it thinks we are
-
-	var eye := head.global_position
-	var aim := (enemy.global_position + Vector3.UP * 1.2 - eye).normalized()
-	me.rpc_id(1, "RequestThrowItem", 1, eye, aim)
-	_check(await _wait_until(func(): return enemy_health.Current < start_health, 3.0), "client: acid beaker didn't hurt the evil guy")
-	_log("beaker hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
-
-	# It should now come for us; stay close and wait for the host to replicate the damage.
-	me.global_position = enemy.global_position + away * 1.2
-	_check(await _wait_until(func(): return my_health.Current < my_health.MaxHealth, 6.0), "client: evil guy never hurt us (host damage didn't replicate)")
+	# Stay next to it (room-centre side, same level) until it swings: proves the host's AI picks us
+	# and its damage replicates back to us.
+	var got_hit := await _wait_until(func():
+		if me.global_position.distance_to(enemy.global_position) > 1.6:
+			var away := -enemy.global_position * Vector3(1, 0, 1)
+			me.global_position = enemy.global_position + (away.normalized() if away.length() > 1.0 else Vector3.BACK) * 1.2
+		return my_health.Current < my_health.MaxHealth, 8.0)
+	if not _check(got_hit, "client: evil guy never hurt us (host damage didn't replicate?)"):
+		return
 	_log("evil guy hit us: %.0f / %.0f" % [my_health.Current, my_health.MaxHealth])
+
+	# It stands still recovering from the swing, so a point-blank throw must land. (At range, a
+	# path-following target can legitimately dodge, which made this flaky.)
+	var start_health: float = enemy_health.Current
+	var eye := head.global_position
+	me.rpc_id(1, "RequestThrowItem", 1, eye, (enemy.global_position + Vector3.UP * 1.2 - eye).normalized())
+	_check(await _wait_until(func(): return enemy_health.Current < start_health, 2.0), "client: point-blank acid beaker didn't hurt the evil guy")
+	_log("beaker hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
 
 
 func _start_main() -> void:

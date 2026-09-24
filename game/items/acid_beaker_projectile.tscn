@@ -33,6 +33,7 @@ properties/2/replication_mode = 0
 script = ExtResource("1_projectile")
 
 [node name="Mesh" type="MeshInstance3D" parent="."]
+visible = false
 mesh = SubResource("CylinderMesh_beaker")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]

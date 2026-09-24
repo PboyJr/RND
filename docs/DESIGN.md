@@ -9,6 +9,14 @@ Last updated: 2026-09-24
 
 ---
 
+## Guiding principle (`Decided`)
+
+**Make everything as intelligent and dynamic as possible.** Entities, systems and the world should
+react to what's actually happening instead of following fixed scripts. Enemies find their way to
+you, adapt when you move, and don't take shortcuts that only look smart. When choosing between a
+simple scripted behaviour and a reactive one, lean reactive, and fix the rough edges rather than
+falling back to the script.
+
 ## Pitch
 
 Co-op horror in the vein of R.E.P.O. You're a team of researchers sent into places where unknown
@@ -124,16 +132,48 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 #### The evil guy (first NPC entity, in the prototype)
 
 - Placeholder look: a tall dark capsule with arms and glowing red eyes. **120 HP**.
-- Wanders near where it spawned. **Chases** the closest player it can see within 12 m, keeps
-  hunting for 4 s after losing sight, and gives up past 20 m.
+- Wanders near where it spawned.
 - Chase speed **4.3 m/s**: faster than walking (4), slower than sprinting (6.5), so you can
   kite it.
+
+**AI v2: it only knows what it perceives** (`Decided` for the prototype, numbers still tuning):
+
+- **Sight:** a **110° vision cone, 14 m** long, blocked by walls, plus an all-round sense within
+  **2.5 m**. Spotting you isn't instant: it takes about 0.3 s up close and about 2 s at 14 m. A
+  glimpse makes it **suspicious** (it comes over to look), and full certainty makes it **hunt**.
+  You can slip past behind it or far away, but not under its nose.
+- **Hearing:** sounds carry a radius, and walls halve it.
+
+  | Sound | Radius |
+  | --- | --- |
+  | Walking | 3 m |
+  | **Sprinting** | **10 m** |
+  | Beaker shattering | 14 m |
+  | Props crashing | 3–18 m (harder and heavier = louder) |
+
+  A noise makes it come and investigate, and a close noise puts it on edge. So **sneaking means
+  walking**, and throwing a beaker is loud (useful as a distraction?).
+- **Memory, not omniscience:** lose line of sight for 0.75 s and it stops tracking you. It heads
+  to where it **last saw you, plus 1 s of where you were going**, looks around, checks a few spots
+  nearby for up to 12 s, then gives up and calms down.
+- **Mood shows in its eyes:** dim red when calm, **orange** when suspicious or searching,
+  **bright red** when hunting, and a flare right before a swing.
+- **Movement smarts:** it drops off ledges when that's the quicker way to you (links are
+  generated from the map automatically). It **shoves props** out of its way (light crates go
+  flying and make noise; the heavy case barely moves). If it gets wedged, it sidesteps and
+  re-plans.
 - **Attack:** its eyes flare as a warning (0.45 s), then it swings for **20 damage** if you're
   still within reach, and pauses for 1 s afterwards.
 - Getting hit makes it go after whoever hit it.
+- **Finds its way to you.** It always follows a real path: around obstacles, up ramps, onto
+  platforms. It only attacks players on roughly its own level (within 0.75 m of height), so
+  standing on a platform doesn't just get you hit from below. It walks round and comes up.
+  If you're somewhere it genuinely can't reach, it waits below and watches you.
 - Respawns **12 s** after dying (prototype convenience).
-- `Open`: what is it, lore-wise? Can it be researched (evidence it leaves behind)? Does it react
-  to thrown props, noise or light?
+- `Idea` (AI v3): learn habits (the spot you keep kiting to, the hiding place you reuse); react to
+  light (flashlights?); crouching for quieter movement; multiple evil guys that share what they
+  notice; distraction play (throw a crate to lure it away).
+- `Open`: what is it, lore-wise? Can it be researched (evidence it leaves behind)?
 
 #### Player monsters on phones (`Idea`)
 

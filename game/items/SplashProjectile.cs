@@ -22,6 +22,8 @@ public partial class SplashProjectile : Node3D
 	[Export] public float MaxLifetime { get; set; } = 5f;
 	[Export] public bool DamagesPlayers { get; set; }
 	[Export] public Color SplashColor { get; set; } = new(0.45f, 1f, 0.3f, 0.8f);
+	// Shattering glass is loud: enemies this far away come to look (walls halve it).
+	[Export] public float ShatterNoiseRadius { get; set; } = 14f;
 
 	// Set by the host before spawning; replicated once, on spawn.
 	[ExportGroup("Network")]
@@ -35,6 +37,8 @@ public partial class SplashProjectile : Node3D
 	private float _age;
 	private bool _shattered;
 
+	// The mesh starts hidden (see the scene): it launches from the thrower's eyes and is shown once
+	// it's clear of their camera.
 	public override void _Ready() => _mesh = GetNode<Node3D>("Mesh");
 
 	public override void _PhysicsProcess(double delta)
@@ -57,6 +61,7 @@ public partial class SplashProjectile : Node3D
 
 		GlobalPosition = to;
 		_mesh.RotateObjectLocal(Vector3.Right, 12f * dt); // tumble
+		_mesh.Visible = _age > 0.03f;
 
 		if (_age > MaxLifetime)
 			Shatter(GlobalPosition, Vector3.Up, null);
@@ -73,6 +78,7 @@ public partial class SplashProjectile : Node3D
 
 		DealSplashDamage(point, directHit);
 		Level.Current?.Effects.Rpc(nameof(Vfx.Effects.Splash), point, normal, SplashColor, SplashRadius);
+		Level.Current?.EmitNoise(point, ShatterNoiseRadius);
 		QueueFree();
 	}
 

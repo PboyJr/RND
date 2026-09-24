@@ -79,6 +79,10 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | LMB with the acid beaker | Throw it (15 s recharge) |
 | Esc | Free the mouse, leave session |
 
+The evil guy only knows what it sees and hears. Sprinting, shattering beakers and crashing props
+are loud, walking is quiet. Its eyes show its mood: dim = calm, orange = suspicious,
+red = hunting you.
+
 ## Layout
 
 ```
