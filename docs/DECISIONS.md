@@ -105,9 +105,10 @@ the level spawned by the host avoids that race.
 
 ## 2026-09-24: Project layout and code style
 
-- **Feature folders** under `game/`: `core/`, `levels/`, `players/`, `props/`, `ui/`, `vfx/`,
-  `tests/`. Each script sits next to its scene.
-- **One namespace per folder:** `RND.Core`, `RND.Levels`, `RND.Players`, `RND.Props`, `RND.UI`.
+- **Feature folders** under `game/`: `core/`, `combat/`, `enemies/`, `items/`, `levels/`,
+  `players/`, `props/`, `ui/`, `vfx/`, `tests/`. Each script sits next to its scene.
+- **One namespace per folder:** `RND.Core`, `RND.Combat`, `RND.Enemies`, `RND.Items`,
+  `RND.Levels`, `RND.Players`, `RND.Props`, `RND.UI`, `RND.Vfx`.
 - Tabs for indentation (Godot's default), file-scoped namespaces.
 
 ## 2026-09-24: Testing: headless smoke tests
@@ -130,6 +131,60 @@ contains local paths; each dev makes their own (template in the README).
 **Decision:** design, decisions and roadmap live in `docs/*.md`, not in anyone's head or chat
 history. Update them in the same change that makes them outdated.
 
+## 2026-09-24: Health is host-owned, on a shared component
+
+**Decision:** anything that can be hurt gets a child node named `Health` (`combat/Health.cs`)
+with its own MultiplayerSynchronizer. **Only the host changes it** (`TakeDamage`, `Revive`). The
+value is replicated, and every peer gets `Damaged` / `Died` / `Revived` signals for visuals.
+
+- On players, the Health node's authority is set back to the host (1) in `_EnterTree`, even
+  though the rest of the player belongs to the owning client.
+
+**Why:** if a client owned its own health, it could simply ignore damage. One component means
+players, enemies and future breakables all work the same way.
+
+## 2026-09-24: Hotbar items are data (`.tres`), per-player state lives on the player
+
+**Decision:**
+- `HotbarItem` / `ThrowableItem` are `[GlobalClass]` Resources (`items/*.tres`): name, tint,
+  cooldown, projectile scene, throw speed.
+- The player's kit is `Player.Loadout`, a typed array of items. Slot 1 (Hands) is built in.
+- Cooldowns are tracked on the **player**, not the resource, because every player shares the same
+  resource. The owner keeps a copy for the HUD, and the **host keeps its own to validate** throws
+  (1 s leeway for network jitter).
+
+**Why:** new items and archetypes are mostly new `.tres` files, not new code.
+
+## 2026-09-24: Thrown projectiles are spawned by the host, flown by everyone
+
+**Decision:** the owner asks the host (`Player.RequestThrowItem` RPC). The host validates it
+(cooldown, alive, throw starts near its view of the player's eyes) and spawns the projectile
+through `ProjectileSpawner`. Starting position, velocity and thrower are replicated **once, at
+spawn**. Every peer then flies the same arc locally. **Only the host's copy** detects the hit,
+deals damage, triggers the splash effect for everyone (`Effects.Splash` RPC) and despawns it.
+
+**Why:** no per-frame position syncing for projectiles, and damage stays host-authoritative.
+
+**Trade-off:** the thrower sees their own beaker appear after a round trip (not noticeable on a
+LAN). Client-side prediction can come later if it feels laggy over the internet.
+
+## 2026-09-24: Enemies are host-authoritative, spawned, with a runtime navmesh
+
+**Decision:**
+- The host runs enemy AI and replicates position, facing and `Telegraphing` (the attack warning).
+  Clients smooth toward it, like remote players.
+- Enemies are **spawned by `EnemySpawner`**, not placed in the level, so a dead enemy despawns on
+  every client.
+- **Navigation:** `NavigationRegion3D` (the level geometry is its child) is **baked at runtime on
+  the host only**, one frame after load, since CSG geometry doesn't exist before that. If there's
+  no path yet, the AI walks straight at its target.
+
+## 2026-09-24: Input actions and layers
+
+- LMB / RMB are `primary` / `secondary`: what they do depends on the selected hotbar slot.
+  Scroll is `scroll_up` / `scroll_down`. Keys 1–5 are `hotbar_1..5`.
+- Physics layer 4 = **Entities** (enemies). Bits are in `core/Layers.cs`.
+
 ---
 
 ## Known limitations / tech debt
@@ -143,4 +198,12 @@ Things the prototype does on purpose that we'll need to revisit:
 - Name labels show peer ids. Real names come with Steam.
 - Walking into props doesn't push them (clients see frozen copies). Grabbing is the only way to
   move them.
-- No crouch, no stamina, no health yet.
+- No crouch or stamina yet.
+- Player movement is still client-authoritative. With combat, a hacked client could teleport or
+  speed-hack away from the evil guy. Fine for co-op; revisit before PvP (player monsters).
+- Building the navmesh from CSG prints a Godot warning ("had to parse RenderingServer meshes at
+  runtime"). It's harmless for grey-box levels and goes away once levels use real meshes with
+  collision shapes (the navmesh already only reads colliders on the World layer).
+- The death "pose" is a placeholder (the capsule tips over), and respawn is a fixed 8 s timer.
+- Only one enemy type. It ignores thrown props, sound and light.
+- The thrower's own beaker appears after a network round trip (no client-side prediction).

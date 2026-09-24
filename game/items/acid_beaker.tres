@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ThrowableItem" format=3]
+
+[ext_resource type="Script" path="res://items/ThrowableItem.cs" id="1_item"]
+[ext_resource type="PackedScene" path="res://items/acid_beaker_projectile.tscn" id="2_projectile"]
+
+[resource]
+script = ExtResource("1_item")
+Projectile = ExtResource("2_projectile")
+ThrowSpeed = 14.0
+ThrowLift = 2.5
+DisplayName = "Acid beaker"
+ShortName = "ACID"
+Tint = Color(0.45, 1, 0.35, 1)
+Cooldown = 15.0

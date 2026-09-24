@@ -71,21 +71,27 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | Input | Action |
 | --- | --- |
 | WASD / Space / Shift | Move / jump / sprint |
-| Hold LMB | Grab and carry (let go to drop; props keep momentum, so you can fling them) |
-| RMB while carrying | Throw |
+| 1–5 / Scroll | Pick a hotbar slot (slot 1 = Hands) |
+| LMB | Use the selected slot |
+| Hold LMB with Hands | Grab and carry (let go to drop; props keep momentum, so you can fling them) |
+| RMB while carrying | Throw the prop |
 | Scroll while carrying | Push / pull |
+| LMB with the acid beaker | Throw it (15 s recharge) |
 | Esc | Free the mouse, leave session |
 
 ## Layout
 
 ```
 game/
-  core/      Main scene + Network autoload (the only code that knows the transport)
+  core/      Main scene, Network autoload (the only code that knows the transport), layers
+  combat/    Health component (host-owned, replicated)
+  enemies/   The evil guy
+  items/     Hotbar items (.tres data) + thrown projectiles (acid beaker)
   levels/    Level base script + test_level greybox (CSG)
-  players/   First-person researcher
+  players/   First-person researcher (Scientist kit)
   props/     PhysicsProp + crate / heavy case / specimen jar
-  ui/        Main menu, HUD
-  vfx/       Grain / cheap-camera post-process
+  ui/        Main menu, HUD, hotbar
+  vfx/       Grain post-process, hit flashes, splash effects
   tests/     Headless smoke test
 docs/        Design, decisions, roadmap
 ```
@@ -109,9 +115,9 @@ docs/        Design, decisions, roadmap
 `_console.exe` Godot build on Windows so the output shows up:
 
 ```
-godot --headless res://tests/smoke_test.tscn -- --role=scenes   # every scene loads; level plays offline
+godot --headless res://tests/smoke_test.tscn -- --role=scenes   # scenes load; level + combat work offline
 godot --headless res://tests/smoke_test.tscn -- --role=host     # start this first...
-godot --headless res://tests/smoke_test.tscn -- --role=client   # ...then this: join, grab, throw, leave
+godot --headless res://tests/smoke_test.tscn -- --role=client   # ...then: join, carry, throw, fight, leave
 ```
 
 Each prints `SMOKE PASS` or `SMOKE FAIL: ...` and exits 0 / 1.

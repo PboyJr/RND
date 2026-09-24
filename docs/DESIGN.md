@@ -84,9 +84,56 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
   - `Open`: which abilities, what the decay curve looks like, whether there's a floor, and
     whether decay can be trained back.
 
+### Player archetypes (`Leaning`)
+
+Players are scientists. Each archetype brings a different kit on the hotbar.
+
+#### The Scientist (first archetype, in the prototype)
+
+- The "main scientist guy". Kit: **acid beaker**.
+- **Acid beaker** (`Decided` for the prototype, numbers still being tuned):
+  - Equip it on the hotbar and press LMB to lob it on an arc. It shatters on the first surface,
+    prop or entity it touches and splashes acid in a **2 m radius**.
+  - **50 damage** on a direct hit, dropping to 50% at the splash edge.
+  - Recharges for **15 s** after each throw. There's no ammo; it just refills.
+  - No friendly fire for now (the splash skips players). `Open`: should it hurt teammates?
+  - `Idea`: leave an acid puddle that damages over time, for area denial and kiting.
+- `Open`: other archetypes and their kits.
+
+### Hotbar (`Decided` for the prototype)
+
+- Slot 1 is always **Hands** (grab / carry / throw props). Slots 2–5 hold the archetype's kit.
+- Keys **1–5** select a slot. **Scroll** cycles slots, except while carrying a prop, when it
+  pushes / pulls it.
+- **LMB uses whatever is selected** (grab with Hands, throw the beaker, and so on).
+- Each slot shows its recharge time. Everyone can see what you're holding (the beaker appears in
+  your hand while it's charged).
+
+### Health, damage, death (`Leaning`)
+
+- Players: **100 HP**. Death is a placeholder: you fall over, then **respawn at a spawn point
+  after 8 s** at full health. `Open`: REPO-style revive-by-teammate instead? Does death cost
+  money or research?
+- Hits flash the body; the local player gets a red screen flash, a health bar and a respawn
+  countdown.
+
 ### Entities / monsters (`Idea`)
 
 - Entities can be **NPCs or player-controlled**.
+
+#### The evil guy (first NPC entity, in the prototype)
+
+- Placeholder look: a tall dark capsule with arms and glowing red eyes. **120 HP**.
+- Wanders near where it spawned. **Chases** the closest player it can see within 12 m, keeps
+  hunting for 4 s after losing sight, and gives up past 20 m.
+- Chase speed **4.3 m/s**: faster than walking (4), slower than sprinting (6.5), so you can
+  kite it.
+- **Attack:** its eyes flare as a warning (0.45 s), then it swings for **20 damage** if you're
+  still within reach, and pauses for 1 s afterwards.
+- Getting hit makes it go after whoever hit it.
+- Respawns **12 s** after dying (prototype convenience).
+- `Open`: what is it, lore-wise? Can it be researched (evidence it leaves behind)? Does it react
+  to thrown props, noise or light?
 
 #### Player monsters on phones (`Idea`)
 
@@ -120,3 +167,7 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 - [ ] Monster players: what can they do, how many per match, phone or PC?
 - [ ] Building: in or out?
 - [ ] Real title?
+- [ ] Acid friendly fire? Lingering acid puddles?
+- [ ] Death: timed respawn (prototype) vs. teammate revive vs. out for the round?
+- [ ] Other archetypes and their kits?
+- [ ] The evil guy's lore, and whether it can be researched

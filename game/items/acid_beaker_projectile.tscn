@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://items/SplashProjectile.cs" id="1_projectile"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+transparency = 1
+albedo_color = Color(0.5, 1, 0.4, 0.75)
+roughness = 0.1
+emission_enabled = true
+emission = Color(0.35, 1, 0.3, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_beaker"]
+material = SubResource("StandardMaterial3D_glass")
+top_radius = 0.06
+bottom_radius = 0.07
+height = 0.18
+radial_segments = 12
+rings = 1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_projectile"]
+properties/0/path = NodePath(".:position")
+properties/0/spawn = true
+properties/0/replication_mode = 0
+properties/1/path = NodePath(".:Velocity")
+properties/1/spawn = true
+properties/1/replication_mode = 0
+properties/2/path = NodePath(".:ThrowerId")
+properties/2/spawn = true
+properties/2/replication_mode = 0
+
+[node name="AcidBeakerProjectile" type="Node3D"]
+script = ExtResource("1_projectile")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("CylinderMesh_beaker")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_projectile")

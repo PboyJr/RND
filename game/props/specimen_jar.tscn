@@ -33,7 +33,7 @@ properties/2/replication_mode = 2
 
 [node name="SpecimenJar" type="RigidBody3D"]
 collision_layer = 4
-collision_mask = 7
+collision_mask = 15
 mass = 2.0
 continuous_cd = true
 script = ExtResource("1_prop")

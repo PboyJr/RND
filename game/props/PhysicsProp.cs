@@ -1,4 +1,5 @@
 using Godot;
+using RND.Core;
 using RND.Players;
 
 namespace RND.Props;
@@ -88,7 +89,7 @@ public partial class PhysicsProp : RigidBody3D
 		if (!Multiplayer.IsServer() || HeldBy != 0)
 			return;
 
-		int sender = SenderId();
+		int sender = Multiplayer.SenderId();
 		if (Player.TryGet(sender, out Player player) && player.EyePosition.DistanceTo(GlobalPosition) < MaxGrabDistance)
 			HeldBy = sender;
 	}
@@ -96,24 +97,18 @@ public partial class PhysicsProp : RigidBody3D
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	public void RequestRelease()
 	{
-		if (Multiplayer.IsServer() && HeldBy == SenderId())
+		if (Multiplayer.IsServer() && HeldBy == Multiplayer.SenderId())
 			HeldBy = 0;
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	public void RequestThrow()
 	{
-		if (!Multiplayer.IsServer() || HeldBy != SenderId() || !Player.TryGet(HeldBy, out Player player))
+		if (!Multiplayer.IsServer() || HeldBy != Multiplayer.SenderId() || !Player.TryGet(HeldBy, out Player player))
 			return;
 
 		HeldBy = 0;
 		ApplyCentralImpulse(player.AimDirection * Mathf.Min(ThrowImpulse, MaxThrowSpeed * Mass));
-	}
-
-	private int SenderId()
-	{
-		int id = Multiplayer.GetRemoteSenderId();
-		return id != 0 ? id : Multiplayer.GetUniqueId(); // 0 when the host calls its own RPC
 	}
 
 	private void SetHeldBy(int peerId)

@@ -26,5 +26,9 @@ update the matching doc in the same turn:
   Always wrap runs in a timeout: if the test script fails to parse, Godot never quits.
 - Conventions: feature folders, one namespace per folder (`RND.Core`, `RND.Players`, ...), tabs,
   file-scoped namespaces, scripts next to their scenes.
-- Networking rules: transport only in `core/Network.cs`; players are client-authoritative; props are
-  host-authoritative (clients send requests via RPC). See DECISIONS before changing.
+- Networking rules: transport only in `core/Network.cs`; player movement is client-authoritative;
+  props, health, enemies and projectiles are host-authoritative (clients send requests via RPC).
+  See DECISIONS before changing.
+- Anything damageable gets a `Health` child (`combat/Health.cs`). New hotbar items are `.tres`
+  files (`items/`), added to a player's `Loadout`. New spawnable scenes must be listed in the
+  level's matching MultiplayerSpawner.

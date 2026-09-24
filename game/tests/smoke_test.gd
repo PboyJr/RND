@@ -15,6 +15,8 @@ const SCENES := [
 	"res://props/crate.tscn",
 	"res://props/crate_large.tscn",
 	"res://props/specimen_jar.tscn",
+	"res://enemies/enemy.tscn",
+	"res://items/acid_beaker_projectile.tscn",
 	"res://ui/main_menu.tscn",
 	"res://ui/hud.tscn",
 ]
@@ -65,7 +67,63 @@ func _run_scenes() -> void:
 	for prop in level.get_node("Props").get_children():
 		_check(not prop.freeze, "offline: %s should simulate on the host" % prop.name)
 		_check(prop.global_position.y > -0.5, "offline: %s fell through the floor" % prop.name)
+	if player != null:
+		await _run_offline_combat(level, player)
 	level.queue_free()
+
+
+# Acid beaker vs. evil guy, evil guy vs. player, death and respawn, all offline as the host.
+func _run_offline_combat(level: Node, player: Node3D) -> void:
+	var beaker = load("res://items/acid_beaker.tres")
+	_check(beaker != null and beaker.Cooldown == 15.0, "acid_beaker.tres didn't load as a 15 s throwable")
+	if not _check(player.Loadout.size() == 1, "player loadout should hold the acid beaker (size %d)" % player.Loadout.size()):
+		return
+
+	var nav := level.get_node("Navigation") as NavigationRegion3D
+	_check(await _wait_until(func(): return nav.navigation_mesh.get_polygon_count() > 0, 5.0), "offline: navmesh didn't bake")
+
+	var enemies := level.get_node("Enemies")
+	if not _check(enemies.get_child_count() == 1, "offline: expected 1 evil guy, found %d" % enemies.get_child_count()):
+		return
+	var enemy := enemies.get_child(0) as Node3D
+	var enemy_health := enemy.get_node("Health")
+	var player_health := player.get_node("Health")
+
+	# Throw: freeze the AI so it stands still, then lob a beaker at it from 5 m.
+	enemy.set_physics_process(false)
+	player.global_position = enemy.global_position + Vector3(0, 0, 5)
+	await _frames(2)
+	var eye: Vector3 = player.get_node("Head").global_position
+	var aim: Vector3 = (enemy.global_position + Vector3.UP * 1.2 - eye).normalized()
+	player.rpc_id(1, "RequestThrowItem", 1, eye, aim)
+	_check(await _wait_until(func(): return enemy_health.Current < enemy_health.MaxHealth, 3.0), "offline: acid beaker didn't hurt the evil guy")
+	var after_hit: float = enemy_health.Current
+	_log("beaker hit: evil guy at %.0f / %.0f" % [after_hit, enemy_health.MaxHealth])
+
+	player.rpc_id(1, "RequestThrowItem", 1, eye, aim) # still recharging, so the host must refuse
+	await _seconds(1.0)
+	_check(enemy_health.Current == after_hit, "offline: beaker ignored its 15 s recharge")
+
+	# Let it loose next to us: it should swing and hurt us.
+	enemy.set_physics_process(true)
+	player.global_position = enemy.global_position + Vector3(0, 0, 1.2)
+	_check(await _wait_until(func(): return player_health.Current < player_health.MaxHealth, 4.0), "offline: evil guy never hurt the player")
+	_log("evil guy hit: player at %.0f / %.0f" % [player_health.Current, player_health.MaxHealth])
+
+	# Player death and respawn.
+	enemy.set_physics_process(false)
+	player.RespawnDelay = 0.5
+	player_health.TakeDamage(9999.0, 0)
+	_check(player_health.Current <= 0.0, "offline: player didn't die")
+	_check(await _wait_until(func(): return player_health.Current == player_health.MaxHealth, 3.0), "offline: player didn't respawn")
+
+	# Evil guy death and respawn.
+	level.EnemyRespawnDelay = 0.5
+	var old_id := enemy.get_instance_id()
+	enemy_health.TakeDamage(9999.0, 1)
+	_check(await _wait_until(func(): return enemies.get_child_count() == 0, 1.0), "offline: dead evil guy wasn't removed")
+	var respawned := await _wait_until(func(): return enemies.get_child_count() == 1 and enemies.get_child(0).get_instance_id() != old_id, 3.0)
+	_check(respawned, "offline: evil guy didn't respawn")
 
 
 func _run_host() -> void:
@@ -128,9 +186,39 @@ func _run_client() -> void:
 	_check(jar.global_position.z < before.z - 1.0, "client: jar didn't fly forward (z %.2f -> %.2f)" % [before.z, jar.global_position.z])
 	_log("threw jar: %s -> %s" % [before, jar.global_position])
 
+	await _run_network_combat(me, head)
+
 	_network.Leave()
 	await _frames(5)
 	_check(_level() == null, "client: level not cleared after leaving")
+
+
+# The host runs the evil guy and all damage; the client throws a beaker and gets hit back.
+func _run_network_combat(me: Node3D, head: Node3D) -> void:
+	var enemies := _level().get_node("Enemies")
+	if not _check(await _wait_until(func(): return enemies.get_child_count() > 0, 5.0), "client: evil guy never replicated"):
+		return
+	var enemy := enemies.get_child(0) as Node3D
+	var enemy_health := enemy.get_node("Health")
+	var my_health := me.get_node("Health")
+	var start_health: float = enemy_health.Current
+
+	# Stand 4 m from it, on the room-centre side so we never end up inside a wall.
+	var away := -enemy.global_position * Vector3(1, 0, 1)
+	away = away.normalized() if away.length() > 1.0 else Vector3.BACK
+	me.global_position = enemy.global_position + away * 4.0
+	await _seconds(0.3) # the host checks the throw starts near where it thinks we are
+
+	var eye := head.global_position
+	var aim := (enemy.global_position + Vector3.UP * 1.2 - eye).normalized()
+	me.rpc_id(1, "RequestThrowItem", 1, eye, aim)
+	_check(await _wait_until(func(): return enemy_health.Current < start_health, 3.0), "client: acid beaker didn't hurt the evil guy")
+	_log("beaker hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
+
+	# It should now come for us; stay close and wait for the host to replicate the damage.
+	me.global_position = enemy.global_position + away * 1.2
+	_check(await _wait_until(func(): return my_health.Current < my_health.MaxHealth, 6.0), "client: evil guy never hurt us (host damage didn't replicate)")
+	_log("evil guy hit us: %.0f / %.0f" % [my_health.Current, my_health.MaxHealth])
 
 
 func _start_main() -> void:
