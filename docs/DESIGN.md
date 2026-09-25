@@ -34,6 +34,12 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 - **Psychosis** (working name): the longer you stay in the maze, the more likely you are to get a
   status effect that makes you and your friends **look like rats**. It feels like a
   hallucination, but it's actually the truth.
+- **Why you keep upgrades when you die** (`Leaning`, 2026-09-25): you're the real scientist,
+  sitting outside the test, with your brain uploaded into a rat. When the rat dies, *you* don't,
+  so you keep (some of) your upgrades. That's the difference from REPO, where dying and the round
+  ending means starting over. `Idea`: what's lost is what the rat had (gear and loot it was
+  carrying, maybe per-round buffs); what's kept is what's in your head (the research tree,
+  upgrades, character level). This also fits persistent characters.
 - `Open`: how this fits the existing pitch (researchers selling evidence to the government or the
   black market). Who is buying, and who are the "entities" to a rat?
 - `Open`: how psychosis builds up (time in the maze only, or other triggers too?), what it does
@@ -41,7 +47,10 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 
 ## Inspiration
 
-- **R.E.P.O.**: physics-based carrying of fragile loot, co-op chaos, proximity voice
+- **R.E.P.O.**: physics-based carrying of fragile loot, co-op chaos, proximity voice, levels
+  stitched together from hand-built rooms
+- **Portal / Portal 2**: test chambers, physics puzzles, co-op puzzles (Portal 2), a watching
+  experimenter on the PA (the maze mode)
 - **Phasmophobia**: rebirth / prestige
 - **Factorio**: research tree for upgrades
 - **Crate / chest opening** after rounds
@@ -86,7 +95,56 @@ The game could have multiple modes, with REPO-style retrieval as one of them:
 In the lore, the modes are different test environments, built to check whether humans in rat
 bodies beat real rats (see [Lore](#lore-idea-2026-09-25)).
 
-- `Open`: what each of maze solving, payload delivery and research plays like, round to round.
+- `Open`: what payload delivery and research play like, round to round (maze: see below).
+
+### The maze: Portal-style test chambers (`Idea`, 2026-09-25)
+
+Very Portal 1/2. A **maze** is a run of **test chambers** joined by short corridors or lifts.
+Each chamber is a physics puzzle: get the team from the entry door to the exit door.
+
+- **Look:** clean, clinical test chambers (white and grey panels, bright even light, numbered
+  signs) in contrast to the dark retrieval sites. An **observation window** high on the wall,
+  where the real scientists watch. Seen from a rat's size, the window and the figures behind it
+  are huge, a quiet hint at the truth (see [Lore](#lore-idea-2026-09-25)).
+- **Puzzle pieces, built from what we already have:**
+  - **Pressure plates** held down by props (the heavy case is our weighted cube) or by standing
+    on them. Doors stay open only while the plate is held.
+  - **Buttons** that open a door for a few seconds, so someone has to run or throw.
+  - **Co-op locks** (Portal 2 co-op): two plates at once, a player holding a door while another
+    passes, throwing a filter or crate across a gap to a teammate.
+  - **The acid flask** melts certain panels, grates or seals: a Scientist-kit puzzle piece.
+  - **Sound locks:** a microphone that opens a door on a loud enough sound, or an alarm that
+    releases something if you're too loud. It reuses `EmitSound`, so noise is both tool and risk.
+- **Pressure:** the filter keeps draining, so a slow chamber costs air; spare filters are placed
+  in chambers as rewards. **Psychosis** builds the longer you're in the maze.
+- **The control group:** every chamber has a **rat par time**, how long a real rat took. The
+  point of the test is beating it. Beating par pays more; the prize at the exit is **cheese**
+  (the experimenters' idea of a reward), which converts to money / research.
+- **The experimenters talk** (GLaDOS-ish): short, clinical PA announcements, maybe shown on the
+  visor, that get stranger as psychosis sets in.
+- **Intelligent and dynamic:** the experimenters **adapt the test**. Solve too fast and the next
+  chamber gets harder (fewer props, a monster released); struggle and they "help" in
+  condescending ways. Later: chambers assembled from modules instead of hand-built.
+- **No portals for now** (`Leaning`). A portal gun is the most Portal thing, but it's a big tech
+  and design job and would crowd out the carry-physics puzzles. Maybe later.
+- **Monsters** (`Leaning`): yes, but only the one evil guy for now, released as a "variable" the
+  experimenters add.
+- **Layout: REPO-style stitched rooms** (`Leaning`). Chambers are hand-built rooms with doorway
+  connectors, and each round stitches a set of them together into a maze. Every room is tagged
+  with a difficulty, and the generator picks from the pool.
+- **Difficulty ramps through the round** (`Leaning`): the further in you get, the more rooms and
+  the harder the rooms.
+- **Starting difficulty from the party's level** (`Leaning`): you don't start from level 1 each
+  round. Before generating, look at the levels of everyone joining and set the difficulty to
+  **`0.7 × average + 0.3 × highest`**. A plain average would let a strong player get carried, or
+  a weak one get crushed, and could be gamed by inviting low-level alts; weighting toward the
+  highest level limits that.
+  - `Idea`: scale rewards so a low-level player in a strong party earns more (they're risking more).
+  - Lore fit: the experimenters calibrate the test to the subjects they were given.
+  - `Open`: what "level" is (character level, rebirths, upgrades owned?), and whether it's
+    recomputed when someone joins mid-round.
+- `Open`: how many rooms per maze, and does failing (the whole team dying, running out of
+  filters) end it? The upload lore says dying costs you the rat, not your progress.
 - `Open`: which Roblox factory game is the reference for Research mode? And how does that mode
   relate to the Factorio-style research tree between rounds?
 - `Open`: are the modes picked per round, per run, or voted on? Do they share upgrades and
@@ -170,7 +228,8 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 
 - Players: **100 HP**. Death is a placeholder: you fall over, then **respawn at a spawn point
   after 8 s** at full health, with a fresh mask and filter. `Open`: REPO-style revive-by-teammate
-  instead? Does death cost money or research?
+  instead? Does death cost money or research? (The upload lore suggests death loses the rat's
+  stuff but not your upgrades, see Lore.)
 - Hits flash your body for everyone else. For you, they crack your visor (see below).
 
 ### The gas mask HUD (`Decided`)
@@ -334,4 +393,5 @@ The mask's filter runs out, and that's a core pressure mechanic.
 - [ ] Filter tuning: is 180 s right? Should swapping take time? Where do spares come from in real levels?
 - [ ] Do the cracks read clearly enough to drop the debug health bar?
 - [ ] Game modes: which ones, and what does each play like? (see Game modes)
+- [ ] Dying: which upgrades do you keep, and what goes down with the rat?
 - [ ] Rat lore: does it replace or reframe the "researchers selling evidence" pitch? (see Lore)
