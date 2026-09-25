@@ -193,7 +193,11 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
 - **No portals for now** (`Leaning`). A portal gun is the most Portal thing, but it's a big tech
   and design job and would crowd out the carry-physics puzzles. Maybe later.
 - **Monsters** (`Leaning`): yes, but only the one evil guy for now, released as a "variable" the
-  experimenters add.
+  experimenters add. **In the prototype** (2026-09-25): he's released **20 s into every chamber**
+  with a growl the whole room hears, so dawdling on the puzzle costs you. A shut door is a wall
+  to him; he goes through open ones, so shutting a door on him is a tactic. `Idea`: tie the
+  delay to how the team is doing (fast team, earlier release), per "the experimenters adapt the
+  test".
 - **Layout: REPO-style stitched rooms** (`Leaning`). Chambers are hand-built rooms with doorway
   connectors, and each round stitches a set of them together into a maze. Every room is tagged
   with a difficulty, and the generator picks from the pool.

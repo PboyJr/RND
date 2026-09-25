@@ -377,14 +377,32 @@ func _run_offline_chamber() -> void:
 	level.queue_free()
 	await _frames(2)
 
+	# The evil guy is the chamber's "variable": not there at the start, released later.
+	level = (load("res://maze/test_chamber.tscn") as PackedScene).instantiate()
+	level.EnemyReleaseDelay = 1.0
+	add_child(level)
+	await _seconds(0.5)
+	_check(level.get_node("Enemies").get_child_count() == 0, "chamber: the evil guy was there from the start")
+	_check(await _wait_until(func(): return level.get_node("Enemies").get_child_count() == 1, 2.0), "chamber: the evil guy was never released")
+	level.queue_free()
+	await _frames(2)
+
+
+# Whether the host's navmesh has a path between two floor points (the end lands on the target).
+func _can_path(level: Node3D, from: Vector3, to: Vector3) -> bool:
+	var path := NavigationServer3D.map_get_path(level.get_world_3d().navigation_map, from, to, true)
+	return not path.is_empty() and path[path.size() - 1].distance_to(to) < 0.5
+
 
 # The exit door stays open only while the plate is weighed down: a player can, and so can the heavy case.
 func _run_offline_plate(level: Node, player: Node3D) -> void:
+	var exit_floor := Vector3(0, 0, -8.5)
 	var plate := level.get_node("Plate") as Node3D
-	var door := level.get_node("ExitDoor") as Node3D
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
 	var case := level.get_node("Props/CaseA") as RigidBody3D
 	var closed := door.position
 	_check(not plate.Pressed and not door.IsOpen, "plate: pressed / door open with nothing on it")
+	_check(not _can_path(level, Vector3.ZERO, exit_floor), "plate: the evil guy can path through the shut exit door")
 	var start := player.global_position
 	player.global_position = plate.global_position + Vector3(0, 0.1, 0)
 	_check(await _wait_until(func(): return plate.Pressed and door.IsOpen, 1.0), "plate: standing on it didn't open the door")
@@ -393,13 +411,14 @@ func _run_offline_plate(level: Node, player: Node3D) -> void:
 	case.global_position = plate.global_position + Vector3(0, 0.7, 0)
 	_check(await _wait_until(func(): return plate.Pressed, 2.0), "plate: the heavy case didn't press it")
 	_check(await _wait_until(func(): return door.position.distance_to(closed) > 3.0, 2.0), "plate: door didn't slide open (moved %.2f m)" % door.position.distance_to(closed))
+	_check(await _wait_until(func(): return _can_path(level, Vector3.ZERO, exit_floor), 1.0), "plate: the evil guy can't path through the open exit door")
 
 
 # The closet button: [E] within reach opens the door for a while, a thrown crate presses it too, and a
 # crate in the doorway stops the door closing.
 func _run_offline_button(level: Node, player: Node3D) -> void:
-	var button := level.get_node("ButtonOutside") as Node3D
-	var door := level.get_node("ClosetDoor") as Node3D
+	var button := level.get_node("Navigation/Geometry/ButtonOutside") as Node3D
+	var door := level.get_node("Navigation/Geometry/ClosetDoor") as Node3D
 	var crate := level.get_node("Props/CrateA") as RigidBody3D
 	var closed := door.position
 	button.OpenSeconds = 1.5

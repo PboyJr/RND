@@ -16,11 +16,16 @@ namespace RND.Levels;
 /// </summary>
 public partial class Level : Node3D
 {
+	private const float ReleaseSoundRadius = 40f; // the whole chamber hears the variable arrive
+
 	public static Level Current { get; private set; }
 
 	[Export] public PackedScene PlayerScene { get; set; }
 	[Export] public PackedScene EnemyScene { get; set; }
 	[Export] public float EnemyRespawnDelay { get; set; } = 12f;
+	// Seconds before the level's enemies first appear (a maze chamber's "variable"). They arrive with a
+	// growl everyone hears. 0: there from the start.
+	[Export] public float EnemyReleaseDelay { get; set; }
 	// Dead players come back on a timer. Off (maze chambers): they stay down until a teammate revives them.
 	[Export] public bool TimedRespawn { get; set; } = true;
 
@@ -60,7 +65,12 @@ public partial class Level : Node3D
 		Callable.From(() => navigation.BakeNavigationMesh()).CallDeferred();
 
 		foreach (Node point in GetTree().GetNodesInGroup("enemy_spawn"))
-			SpawnEnemy((Node3D)point);
+		{
+			if (EnemyReleaseDelay > 0f)
+				SpawnEnemyLater((Node3D)point, EnemyReleaseDelay, announce: true);
+			else
+				SpawnEnemy((Node3D)point);
+		}
 	}
 
 	public override void _ExitTree()
@@ -134,14 +144,18 @@ public partial class Level : Node3D
 		enemy.Rotation = new Vector3(0, point.GlobalRotation.Y, 0);
 		enemy.SyncPosition = enemy.Position;
 		enemy.SyncYaw = enemy.Rotation.Y;
-		enemy.GetNode<Health>("Health").Died += _ => RespawnEnemyLater(point);
+		enemy.GetNode<Health>("Health").Died += _ => SpawnEnemyLater(point, EnemyRespawnDelay, announce: false);
 		_enemies.AddChild(enemy, forceReadableName: true);
 	}
 
-	private async void RespawnEnemyLater(Node3D point)
+	private async void SpawnEnemyLater(Node3D point, float delay, bool announce)
 	{
-		await ToSignal(GetTree().CreateTimer(EnemyRespawnDelay), SceneTreeTimer.SignalName.Timeout);
-		if (IsInstanceValid(this) && IsInsideTree() && IsInstanceValid(point))
-			SpawnEnemy(point);
+		await ToSignal(GetTree().CreateTimer(delay), SceneTreeTimer.SignalName.Timeout);
+		if (!IsInstanceValid(this) || !IsInsideTree() || !IsInstanceValid(point))
+			return;
+
+		SpawnEnemy(point);
+		if (announce)
+			EmitSound(point.GlobalPosition, ReleaseSoundRadius, SoundKind.Growl);
 	}
 }

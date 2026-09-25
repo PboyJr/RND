@@ -522,7 +522,8 @@ wouldn't fix this, since a synced file is still editable.
   **all** of its `Plates` are pressed. Every peer works this out from the replicated plates and
   slides its own copy, so the door needs no synchronizer. It pushes players and props out of the
   way as it closes. The host plays the `Impact` sound when it starts moving (no new recipe).
-- Doors sit **outside** the `Navigation` node, so the navmesh is baked as if they were open.
+- ~~Doors sit **outside** the `Navigation` node, so the navmesh is baked as if they were open.~~
+  Superseded the same day, see "Doors are walls to the navmesh" below.
 
 **Why:** weight, rather than "anything touching it", makes the heavy case the weighted cube for
 free, and lets players improvise (a pile of crates works). Deriving the door from the plates
@@ -566,6 +567,28 @@ keeps one piece of replicated state per puzzle piece.
   exactly what happened to the `Revive()` calls above.
 
 **Why:** the smallest loop that has an end state and a way to lose, built from what exists.
+
+## 2026-09-25: Doors are walls to the navmesh, with a link that's on while they're open
+
+**Decision:**
+- Chamber doors and buttons go **inside `Navigation/Geometry`**, so the navmesh is baked with
+  the doors shut (an `AnimatableBody3D` is a `StaticBody3D`, so it's parsed as a static collider).
+  To the evil guy, a door is a wall.
+- Each `ChamberDoor` makes a `NavigationLink3D` through its doorway (1.2 m each side, on the floor,
+  `TopLevel` so it stays put while the door slides). It's **enabled only while the door is fully
+  open**, so he never plans into a half-open door, and the moment a door starts closing his route
+  is gone. It's the same mechanism as the drop-down links.
+- A closing door also waits for enemies (its test mask includes `Entities`).
+- `Level.EnemyReleaseDelay`: a level's enemies first appear after this many seconds, with a
+  `Growl` via `EmitSound` (40 m, so everyone hears it and knows). The test chamber uses 20 s.
+
+**Why:** re-baking the navmesh every time a door moves is slow and would regenerate the drop
+links. A link toggled with the door is one flag on the host. Baking the doors shut means
+unreachable really is unreachable: he waits at the door instead of walking into it.
+
+**How we verified it:** the smoke test asks the navmesh for a path from the room to the exit
+with the door shut (none) and fully open (found). Forcing the link always on makes the "shut"
+check fail, so it's not passing by accident.
 
 ## Known limitations / tech debt
 
@@ -623,9 +646,10 @@ Things the prototype does on purpose that we'll need to revisit:
   so a late joiner's clock is off and they never see the test as passed. Sync the chamber state
   once chambers chain into a maze.
 - Passing a chamber doesn't lead anywhere yet: there's one chamber and no next one.
-- The navmesh treats chamber doors as always open, so an enemy would path into a closed door and
-  rely on stuck recovery. No enemy is in a chamber yet; before "the evil guy as a variable",
-  make the AI treat a closed door as a wall (a nav link or a region that's switched off with the door).
+- The evil guy walking through an open door is only checked as "a path exists", not by watching
+  him walk it (drop links work the same way and he walks those).
+- Standing at a shut door is all he does about it: he doesn't wait for it to open, or look for
+  another way round, unless the search takes him there.
 - Plates, buttons and doors are only smoke-tested offline. `Pressed` replicates like any other
   synced property, but the network roles still run on the test level, not the chamber.
 - Doors and buttons have no sounds of their own (both reuse `Impact`), no ticking while a button
@@ -637,8 +661,6 @@ Things the prototype does on purpose that we'll need to revisit:
   roles still play the test level. Offline, a whole run (pass, restart, fail) is tested, and so is
   a revive over the network.
 - The hold-[E] revive (aiming, progress) isn't tested; the test sends `RequestRevive` directly.
-- With no enemy in chambers yet, nothing can actually down you there, so a run can't really be
-  lost in play yet.
 - The run picks chambers at random from a pool of one, and restarts on its own after the result
   screen (no lobby, no reward yet).
 - Telling mental from physical drops on clients relies on the health synchronizer sending `Mental`

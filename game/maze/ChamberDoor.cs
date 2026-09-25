@@ -31,15 +31,32 @@ public partial class ChamberDoor : AnimatableBody3D
 
 	public bool IsOpen => Switches.Count > 0 && (OpensOnAny ? Switches.Any(IsPressed) : Switches.All(IsPressed));
 
+	private const float LinkReach = 1.2f; // how far each side of the door the enemy link starts, past the navmesh's edge
+
 	private Vector3 _closed;
 	private bool _wasOpen;
+	private NavigationLink3D _link;
 
 	private static bool IsPressed(Node node) => ((ISwitch)node).Pressed;
 
 	public override void _Ready()
 	{
 		_closed = Position;
-		CollisionMask = Layers.Players | Layers.Props; // only for the "something's in the way" test
+		CollisionMask = Layers.Players | Layers.Props | Layers.Entities; // only for the "something's in the way" test
+
+		// Doors sit in the level geometry, so the navmesh is baked with them shut: to enemies a door is
+		// a wall. This link through the doorway (on the floor, left where the door was placed) is only on
+		// while the door is fully open.
+		float floor = -((BoxShape3D)GetNode<CollisionShape3D>("Shape").Shape).Size.Y / 2f;
+		_link = new NavigationLink3D
+		{
+			TopLevel = true,
+			Enabled = false,
+			StartPosition = new Vector3(0, floor, -LinkReach),
+			EndPosition = new Vector3(0, floor, LinkReach),
+		};
+		AddChild(_link);
+		_link.GlobalTransform = GlobalTransform;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -56,5 +73,6 @@ public partial class ChamberDoor : AnimatableBody3D
 		if (!open && TestMove(GlobalTransform, parentBasis * motion))
 			return;
 		Position += motion;
+		_link.Enabled = Position.DistanceTo(_closed + OpenOffset) < 0.05f;
 	}
 }

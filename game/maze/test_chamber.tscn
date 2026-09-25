@@ -48,6 +48,7 @@ script = ExtResource("1_level")
 PlayerScene = ExtResource("2_player")
 EnemyScene = ExtResource("3_enemy")
 TimedRespawn = false
+EnemyReleaseDelay = 20.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_chamber")
@@ -123,20 +124,20 @@ shape = SubResource("BoxShape3D_exit")
 [node name="Plate" parent="." instance=ExtResource("7_plate")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -3)
 
-[node name="ExitDoor" parent="." node_paths=PackedStringArray("Switches") instance=ExtResource("8_door")]
+[node name="ExitDoor" parent="Navigation/Geometry" node_paths=PackedStringArray("Switches") instance=ExtResource("8_door")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -6.2)
-Switches = [NodePath("../Plate")]
+Switches = [NodePath("../../../Plate")]
 
-[node name="ClosetDoor" parent="." node_paths=PackedStringArray("Switches") instance=ExtResource("8_door")]
+[node name="ClosetDoor" parent="Navigation/Geometry" node_paths=PackedStringArray("Switches") instance=ExtResource("8_door")]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -6.1, 1.5, 0)
 Switches = [NodePath("../ButtonOutside"), NodePath("../ButtonInside")]
 OpensOnAny = true
 OpenOffset = Vector3(0, 0, 3.1)
 
-[node name="ButtonOutside" parent="." instance=ExtResource("10_button")]
+[node name="ButtonOutside" parent="Navigation/Geometry" instance=ExtResource("10_button")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 3.5)
 
-[node name="ButtonInside" parent="." instance=ExtResource("10_button")]
+[node name="ButtonInside" parent="Navigation/Geometry" instance=ExtResource("10_button")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.2, 0, 1.1)
 
 [node name="Props" type="Node3D" parent="."]
@@ -173,6 +174,11 @@ script = ExtResource("4_effects")
 
 [node name="Ambience" type="Node3D" parent="."]
 script = ExtResource("5_ambience")
+
+[node name="EnemySpawnPoints" type="Node3D" parent="."]
+
+[node name="EnemySpawn1" type="Marker3D" parent="EnemySpawnPoints" groups=["enemy_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.05, -5)
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 

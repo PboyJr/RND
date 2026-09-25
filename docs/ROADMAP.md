@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (M8 started: maze runs with a pass / fail result, teammate revive)
+Last updated: 2026-09-25 (M8: maze runs with a pass / fail result, teammate revive, the evil guy in chambers)
 
 ---
 
@@ -110,7 +110,7 @@ Goal: sound sells the mask as much as the visor does.
 - [x] Timed button ([E] or a thrown prop), doors that wait for whatever's in the way (a crate
       jams them), and the heavy case in a closet behind a button door
 - [ ] Chain chambers into a maze (REPO-style stitched rooms), difficulty ramp
-- [ ] The evil guy as a maze "variable"
+- [x] The evil guy as a maze "variable" (see M8)
 
 ### M8: A maze run: from proof of concept to a game (in progress)
 
@@ -122,8 +122,8 @@ through the chambers under pressure → pass or fail → reward → go again.
       then a new run
 - [x] **Teammate revive:** in chambers you don't respawn. You're down until a teammate holds [E]
       on you for 3 s (back at 50 health, where you fell). **Everyone down at once fails the run**
-- [ ] **The evil guy in chambers:** doors must block its pathfinding first (see DECISIONS known
-      limitations). Without it, there's nothing that can make you lose
+- [x] **The evil guy in chambers:** released 20 s into each chamber with a growl the whole room
+      hears. Shut doors are walls to his pathfinding; open ones he walks through
 - [ ] **Rewards:** the run pays out (money / XP) into the local profile (`user://profile.json`,
       see DESIGN → How player data is stored), and `RunCount` goes up at run start
 - [ ] **More chambers** (content), so a run isn't the same room three times, then the difficulty
