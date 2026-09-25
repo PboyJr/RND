@@ -233,14 +233,46 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
 - Characters are saved across sessions and instances (REPO doesn't do this).
 - **The catch:** a character's abilities (TBD) deteriorate the longer the character goes unused.
 - Things to settle:
-  - **Where saves live.** Local save files can be edited. If characters can join other people's
-    lobbies, fairness needs server-side storage or at least validation by the host.
-  - **What "time" means.** Decay on real-world time can be cheated by changing the system clock,
-    and it punishes people who take a break. *Suggestion:* count decay in **runs played on other
-    characters**. That can't be cheated and creates a roster / bench dynamic: you juggle
-    characters, and benched ones get rusty. It pairs well with rebirth.
+  - **Where saves live.** Decided: a local file, clamped by the host (see below).
+  - **What "time" means.** Decided: **runs played on other characters**, not real time (real
+    time can be cheated with the system clock, and it punishes people who take a break). It
+    creates a roster / bench dynamic: you juggle characters, and benched ones get rusty. It pairs
+    well with rebirth.
   - `Open`: which abilities, what the decay curve looks like, whether there's a floor, and
     whether decay can be trained back.
+
+#### How player data is stored (`Decided` 2026-09-25, numbers still open)
+
+- **What's saved follows the upload lore:** only what's "in your head" is saved (character level,
+  rebirths, research tree, upgrades, ability levels). What the rat had (gear, loot, per-round
+  buffs) lives in the round and is never written to disk. That makes "what do you lose on death"
+  a data question: if it's not in the save, you lose it.
+- **One profile per player, holding a roster of characters.** Money and the research tree are
+  **per profile**: the scientist keeps them, whichever rat they're in. Roughly:
+  `Profile { Version, RunCount, Money, Research, Characters[] }` and
+  `Character { Id, Name, Archetype, Level, Rebirths, Upgrades, Abilities, LastRun }`.
+  - `Open`: are upgrades per character (as above) or per profile like the research tree?
+- **A run counts when a round starts.** `RunCount` goes up and is saved at round start, so
+  quitting a round can't dodge decay on your other characters.
+- **Decay is computed, never stored.** Each character has `LastRun`. Rust = `RunCount − LastRun`
+  (roughly, runs played on other characters), and each ability's effective value = its trained
+  value run through the decay curve. Nothing ticks and nothing drifts; the floor and the curve
+  shape are just parameters of that function, so they can be tuned without migrating saves.
+  - Consequence: a one-character player never decays. That fits "benched characters get rusty".
+- **Retraining is gradual.** Each run on a character moves its `LastRun` forward by `K` runs
+  (capped at `RunCount`), so a rusty character sheds rust over a few runs instead of snapping
+  back. `K` is a tuning number (`Open`, 3 to start).
+- **Where it lives: a local JSON file** (`user://profile.json`) for now. On join, the client
+  sends its active character's summary to the host. The host **clamps** it (level and upgrades
+  within what's possible) but otherwise trusts it. Same stance as client-authoritative movement:
+  cheating in co-op mostly cheats yourself. The one place it touches others is the maze
+  difficulty formula (`0.7 × average + 0.3 × highest`), where a faked level makes the room
+  harder for everyone, hence the clamp. **Later**, our backend can hold the same record keyed by
+  Steam id; the format doesn't change, only who writes it. (Steam Cloud alone doesn't help: it
+  syncs the file, but the file is still editable.)
+- **Who writes results:** the host decides a round's outcome (it's host-authoritative anyway)
+  and sends each player their results (XP, money, research) by RPC. The player's own game
+  applies them and saves. With a backend, the host reports results to the server instead.
 
 ### Player archetypes (`Leaning`)
 
@@ -437,8 +469,9 @@ filter, see Lore → "The mask is the lie".)
 - [ ] Value / fragility on props?
 - [ ] Non-physical evidence types?
 - [ ] Black market: how you get caught, who pays, round-level consequences?
-- [ ] Character abilities: what they are, and how decay works (real time vs runs played)?
-- [ ] Where do characters live: local, host-validated, or our own server?
+- [ ] Character abilities: what they are, the decay curve and floor, and the retraining rate `K`?
+  (Storage and "time" are decided: see Persistent characters → How player data is stored.)
+- [ ] Upgrades: per character or per profile?
 - [ ] Monster players: what can they do, how many per match, phone or PC?
 - [ ] Building: in or out?
 - [ ] Real title?

@@ -488,6 +488,29 @@ projected HUD, `VisorHud` scrambles its text, and `MaskSynth` adds a tinnitus to
 (see DESIGN → "The mask is the lie"). A second pool would need its own death rules and a second
 readout.
 
+## 2026-09-25: Player data is a local profile, host-clamped; decay counts runs
+
+**Decision:**
+- One `user://profile.json` per player: `RunCount`, money and the research tree (per profile),
+  and a roster of characters (level, rebirths, upgrades, abilities, `LastRun`). Only what's "in
+  the scientist's head" is saved; the rat's gear and loot never are.
+- `RunCount` goes up and is saved **when a round starts**, so quitting can't dodge decay.
+- **Decay is derived, not stored:** rust = `RunCount − LastRun`, fed through a curve when an
+  ability is read. Playing a character moves `LastRun` forward by `K` runs (capped), so retraining
+  is gradual.
+- On join, the client sends its active character to the host, which clamps impossible values.
+  The host sends round results back by RPC; each client applies them and saves its own file.
+
+**Why:** there's no backend or Steam yet, and co-op cheating mostly only affects the cheater
+(the same call as client-authoritative movement). The clamp covers the one shared effect: the
+maze difficulty formula reads everyone's level. Counting runs instead of real time can't be
+cheated with the clock and doesn't punish breaks. A derived rust value means the curve can be
+retuned without migrating saves.
+
+**Trade-off:** saves can be edited. When there's a backend, it stores the same record (keyed by
+Steam id) and the host reports results to it; the format stays the same. Steam Cloud alone
+wouldn't fix this, since a synced file is still editable.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:

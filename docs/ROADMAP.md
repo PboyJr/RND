@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (M7 maze mode started: level picker and the first test chamber with a start and an end)
+Last updated: 2026-09-25 (player data storage designed; M7 maze mode started: level picker and the first test chamber with a start and an end)
 
 ---
 
@@ -136,7 +136,8 @@ Rough order, and likely to change:
 - **Evidence types:** beyond physical props (photos, recordings, readings?)
 - **Selling:** government vs black market, getting-caught fines
 - **Between-round hub:** research / upgrade tree (Factorio-ish), crate opening
-- **Persistent characters + decay:** needs the "where saves live" decision (see DESIGN)
+- **Persistent characters + decay:** storage is designed (local profile JSON, host-clamped, decay
+  in runs; see DESIGN). Still needs the abilities and the decay curve before it's worth building.
 - **Rebirth / prestige**
 - **Player-controlled monsters:** prototype on PC first, then decide on the phone client
 - **More game modes** (idea): maze solving, payload delivery, and a Research mode, alongside
