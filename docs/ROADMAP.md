@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (M8: maze runs with a pass / fail result, teammate revive, the evil guy in chambers)
+Last updated: 2026-09-25 (M8: two new chambers and a difficulty ramp; more chambers in progress)
 
 ---
 
@@ -127,7 +127,17 @@ through the chambers under pressure → pass or fail → reward → go again.
 - [ ] **Rewards:** the run pays out (money / XP) into the local profile (`user://profile.json`,
       see DESIGN → How player data is stored), and `RunCount` goes up at run start
 - [ ] **More chambers** (content), so a run isn't the same room three times, then the difficulty
-      ramp and the party-level starting difficulty
+      ramp and the party-level starting difficulty (**in progress**, started 2026-09-25)
+  - [x] Two new chambers, three in total, easiest to hardest: **Crates** (four crates hold the
+        exit plate; a jar or three crates don't), the first chamber (case in the button closet),
+        and **Ledge** (the exit needs its plate held *and* a button on a 3.5 m ledge, pressed by
+        lobbing a jar at it; then 5 s to get through, or jam the door)
+  - [x] Difficulty ramp: a run climbs the chamber list from easiest to hardest
+  - [x] Smoke test: every chamber spawns you, the evil guy can reach the start, the exit is shut;
+        Crates and Ledge are solved in the test (Ledge with a real-speed jar throw)
+  - [ ] Playtest the new chambers (is the ledge button easy enough to spot and hit?)
+  - [ ] More chambers per difficulty, so runs vary
+  - [ ] Starting difficulty from the party's level (needs player levels first)
 - [ ] Between runs: somewhere to spend the reward (upgrades / research tree), instead of an
       automatic restart
 

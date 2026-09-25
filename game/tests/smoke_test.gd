@@ -16,6 +16,8 @@ const SCENES := [
 	"res://core/main.tscn",
 	"res://levels/test_level.tscn",
 	"res://maze/test_chamber.tscn",
+	"res://maze/chamber_crates.tscn",
+	"res://maze/chamber_ledge.tscn",
 	"res://maze/pressure_plate.tscn",
 	"res://maze/chamber_door.tscn",
 	"res://maze/chamber_button.tscn",
@@ -108,6 +110,7 @@ func _run_scenes() -> void:
 	level.queue_free()
 	await _frames(2)
 	await _run_offline_chamber()
+	await _run_offline_chambers()
 	await _run_offline_run()
 
 
@@ -392,6 +395,114 @@ func _run_offline_chamber() -> void:
 	await _frames(2)
 
 
+# Every chamber in the maze run: you spawn in its start corridor, the evil guy could reach you there,
+# and its exit is shut until the puzzle is solved. The newer chambers get solved here too.
+func _run_offline_chambers() -> void:
+	var main := (load("res://core/main.tscn") as PackedScene).instantiate()
+	var chambers: Array = main.get_node("Run").Chambers
+	main.free()
+	_check(chambers.size() >= 3, "chambers: a maze run has only %d chambers to pick from" % chambers.size())
+	for packed: PackedScene in chambers:
+		var chamber := packed.resource_path.get_file().get_basename()
+		var level := packed.instantiate()
+		level.EnemyReleaseDelay = 999.0 # keep him out of the puzzle checks
+		add_child(level)
+		await _seconds(1.0)
+		var player := level.get_node_or_null("Players/1") as Node3D
+		var exit := level.get_node("Exit") as Node3D
+		var exit_floor := exit.global_position - Vector3(0, 1.5, 0)
+		if _check(player != null, "%s: didn't spawn the local player" % chamber):
+			_check(player.is_on_floor(), "%s: player isn't standing on the floor" % chamber)
+			_check(player.global_position.distance_to(exit.global_position) > 10.0, "%s: player spawned near the exit" % chamber)
+			_check(not exit.IsComplete, "%s: passed before anyone reached the exit" % chamber)
+			_check(not _can_path(level, player.global_position, exit_floor), "%s: the exit is open from the start" % chamber)
+			var lair := (level.get_node("EnemySpawnPoints").get_child(0) as Node3D).global_position
+			_check(_can_path(level, lair, player.global_position), "%s: the evil guy couldn't reach the start corridor" % chamber)
+			for prop in level.get_node("Props").get_children():
+				_check(prop.global_position.y > -0.5, "%s: %s fell through the floor" % [chamber, prop.name])
+			match chamber:
+				"chamber_crates": await _solve_crates(level, exit_floor)
+				"chamber_ledge": await _solve_ledge(level, player, exit_floor)
+		level.queue_free()
+		await _frames(2)
+
+
+# The easy chamber: a jar or three crates don't hold the plate, four crates do.
+func _solve_crates(level: Node, exit_floor: Vector3) -> void:
+	var plate := level.get_node("Plate") as Node3D
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
+	var jar := level.get_node("Props/JarA") as RigidBody3D
+	jar.global_position = plate.global_position + Vector3(0, 0.3, 0)
+	await _seconds(0.5)
+	_check(not plate.Pressed, "crates: a jar held the plate down")
+	jar.global_position = plate.global_position + Vector3(2.5, 0.3, 0)
+	var corners := [Vector3(-0.35, 0.35, -0.35), Vector3(0.35, 0.35, -0.35), Vector3(-0.35, 0.35, 0.35), Vector3(0.35, 0.35, 0.35)]
+	for i in 4:
+		var crate := level.get_node("Props").get_child(i) as RigidBody3D
+		crate.global_position = plate.global_position + corners[i]
+		crate.linear_velocity = Vector3.ZERO
+		if i == 2:
+			await _seconds(0.5)
+			_check(not plate.Pressed, "crates: three crates held the plate down")
+	_check(await _wait_until(func(): return plate.Pressed and door.IsOpen, 2.0), "crates: four crates on the plate didn't open the exit")
+	_check(await _wait_until(func(): return _can_path(level, Vector3.ZERO, exit_floor), 3.0), "crates: no path through the open exit")
+
+
+# The hard chamber: the exit needs the plate held *and* the button up on the ledge, which is out of
+# reach from the floor. A jar lobbed from by the exit door (a real throw's speed) presses it.
+func _solve_ledge(level: Node, player: Node3D, exit_floor: Vector3) -> void:
+	var plate := level.get_node("Plate") as Node3D
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
+	var button := level.get_node("Navigation/Geometry/LedgeButton") as Node3D
+	var case := level.get_node("Props/CaseA") as RigidBody3D
+	var jar := level.get_node("Props/JarA") as RigidBody3D
+
+	var start := player.global_position
+	player.global_position = Vector3(4.1, 0.05, 0) # at the foot of the ledge, under the button
+	await _frames(2)
+	button.RequestPress()
+	await _frames(2)
+	_check(not button.Pressed, "ledge: pressed the button from the floor")
+	player.global_position = start
+
+	case.global_position = plate.global_position + Vector3(0, 0.7, 0)
+	_check(await _wait_until(func(): return plate.Pressed, 2.0), "ledge: the case didn't press the plate")
+	await _seconds(0.5)
+	_check(not door.IsOpen, "ledge: the plate alone opened the exit")
+
+	var from := Vector3(0, 1.7, -5.5)
+	var target := (button.get_node("HitZone") as Node3D).global_position
+	var hit := false
+	for attempt in 4: # aim a little long each time, like a player would (air drag)
+		var aim := target + (target - from).slide(Vector3.UP).normalized() * 0.3 * attempt
+		jar.global_position = from
+		jar.angular_velocity = Vector3.ZERO
+		jar.linear_velocity = _lob(from, aim, 12.0)
+		hit = await _wait_until(func(): return button.Pressed, 2.0)
+		if hit:
+			_log("ledge: a lobbed jar hit the button on throw %d" % (attempt + 1))
+			break
+	if not _check(hit, "ledge: a jar lobbed from the exit door never hit the button"):
+		return
+	_check(await _wait_until(func(): return door.IsOpen, 0.5), "ledge: plate + button didn't open the exit")
+	_check(await _wait_until(func(): return _can_path(level, Vector3(0, 0, -5), exit_floor), 3.0), "ledge: no path through the open exit")
+	_check(await _wait_until(func(): return not door.IsOpen, 6.0), "ledge: the exit stayed open after the button popped up")
+
+
+# Launch velocity at this speed that lands on the target (the flatter of the two arcs, no drag).
+func _lob(from: Vector3, to: Vector3, speed: float) -> Vector3:
+	var flat := (to - from).slide(Vector3.UP)
+	var x := flat.length()
+	var y := to.y - from.y
+	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+	var v2 := speed * speed
+	var disc := v2 * v2 - g * (g * x * x + 2.0 * y * v2)
+	if disc < 0.0:
+		return Vector3.ZERO
+	var angle := atan((v2 - sqrt(disc)) / (g * x))
+	return flat.normalized() * speed * cos(angle) + Vector3.UP * speed * sin(angle)
+
+
 # Whether the host's navmesh has a path between two floor points (the end lands on the target).
 func _can_path(level: Node3D, from: Vector3, to: Vector3) -> bool:
 	var path := NavigationServer3D.map_get_path(level.get_world_3d().navigation_map, from, to, true)
@@ -470,6 +581,9 @@ func _run_offline_run() -> void:
 		var loaded := await _wait_until(func(): return run.Chamber == test and _players() != null and _players().has_node("1"), 3.0)
 		if not _check(loaded, "run: chamber %d never loaded" % (test + 1)):
 			break
+		# Difficulty ramps: a 2-chamber run is the easiest chamber, then the hardest.
+		var expected: PackedScene = run.Chambers[0 if test == 0 else run.Chambers.size() - 1]
+		_check(_level().scene_file_path == expected.resource_path, "run: chamber %d was %s, not %s" % [test + 1, _level().scene_file_path, expected.resource_path])
 		await _seconds(0.3)
 		_players().get_node("1").global_position = _level().get_node("Exit").global_position - Vector3(0, 1.4, 0)
 	_check(await _wait_until(func(): return run.Result == 1, 3.0), "run: passing the last chamber didn't pass the run")

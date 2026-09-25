@@ -202,7 +202,17 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
   connectors, and each round stitches a set of them together into a maze. Every room is tagged
   with a difficulty, and the generator picks from the pool.
 - **Difficulty ramps through the round** (`Leaning`): the further in you get, the more rooms and
-  the harder the rooms.
+  the harder the rooms. **In the prototype** (2026-09-25): three chambers, and a 3-chamber run
+  plays them easiest to hardest:
+  1. **Crates:** the exit plate, and no heavy case. Four crates side by side hold it; a jar or three
+     crates don't. Teaches weight.
+  2. **The first chamber:** the heavy case is in a closet behind a button door.
+  3. **Ledge:** the exit needs its plate held (the case) **and** a button on a 3.5 m ledge, out of
+     reach from the floor. You lob a jar at it (only jars fly far enough; crates are too heavy
+     to throw that high), which opens the exit for 5 s: get everyone through, or jam the door
+     with a crate. Standing on the case and jumping might also reach it, but then the case isn't
+     on the plate.
+  - `Open`: is the ledge button easy enough to spot from the floor and hit? Playtest it.
 - **Starting difficulty from the party's level** (`Leaning`): you don't start from level 1 each
   round. Before generating, look at the levels of everyone joining and set the difficulty to
   **`0.7 × average + 0.3 × highest`**. A plain average would let a strong player get carried, or

@@ -69,6 +69,8 @@ a { color: var(--accent); }
 .decided { background: var(--decided); } .leaning { background: var(--leaning); }
 .idea { background: var(--idea); } .open { background: var(--open); }
 
+.now { border: 1px solid var(--accent); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 14px; background: var(--accent-soft); }
+.now .label { color: var(--accent); }
 .secret { border: 1px dashed var(--open); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }
 .secret .label { color: var(--open); }
 
@@ -103,6 +105,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <div class="wrap">
 <nav aria-label="Sections">
+	<a href="#now">Working on now</a>
 	<a href="#game">The game</a>
 	<a href="#secret">The secret</a>
 	<a href="#round">A round</a>
@@ -132,6 +135,21 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<span><span class="pill open">Open</span> needs an answer</span>
 	</div>
 </header>
+
+<section id="now">
+	<h2>Working on now</h2>
+	<div class="now">
+		<p class="label">In progress · 25 Sep 2026</p>
+		<p><strong>More test chambers for the maze run.</strong> A run used to be the same room three times. There are now three chambers, and a run plays them from easiest to hardest:</p>
+		<ol>
+			<li><strong>Crates.</strong> The exit opens while its plate is held down, and there's no heavy case this time. Four crates side by side are heavy enough; a jar or three crates aren't.</li>
+			<li><strong>The closet.</strong> The first chamber we built: the heavy case is shut in a closet behind a button door.</li>
+			<li><strong>Ledge.</strong> The exit needs its plate held <em>and</em> a button pressed that sits on a ledge <span class="num">3.5 m</span> up, out of reach. Hit it with a thrown jar, then everyone has <span class="num">5 s</span> to get through, or you jam the door open with a crate.</li>
+		</ol>
+		<p><strong>Still to do here:</strong> playtest the new chambers (can you spot the ledge button, and hit it?), build more chambers so runs vary, and later start the difficulty from the party's level.</p>
+		<p><strong>Then:</strong> the rest of the maze run. A finished run pays out a reward, and you get somewhere to spend it between runs.</p>
+	</div>
+</section>
 
 <section id="game">
 	<h2>The game in one minute</h2>
@@ -180,12 +198,14 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><strong>Rooms are stitched together</strong> each round from a pool, getting harder the further in you go. <span class="pill leaning">Leaning</span></li>
 		<li><strong>Starting difficulty</strong> leans toward the strongest player, so a strong player can't be carried and nobody can game it with low-level friends. <span class="pill leaning">Leaning</span></li>
 		<li><strong>No portal gun</strong> for now. <span class="pill leaning">Leaning</span></li>
+		<li><strong>The evil guy is let loose</strong> 20 seconds into every chamber, with a growl everyone hears. A shut door stops him; an open one doesn't. <em>Built.</em></li>
+		<li><strong>A run is three chambers,</strong> easiest first. <em>Built,</em> with three chambers so far.</li>
 	</ul>
 </section>
 
 <section id="today">
 	<h2>What's playable today</h2>
-	<p>Two levels: a dark test room with a creature in it, and one grey-box test chamber. Up to a few players on the same network.</p>
+	<p>Two ways to play, picked by the host in the menu: a dark test room with a creature in it, and a <strong>maze run</strong> through three grey-box test chambers. Up to a few players on the same network.</p>
 	<div class="features">
 		<div>
 			<h3>Carrying</h3>
@@ -235,7 +255,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 			<ul>
 				<li>The Scientist throws a flask of glowing acid: <span class="num">50</span> damage, <span class="num">2 m</span> splash, refills in <span class="num">5 s</span></li>
 				<li>You have <span class="num">100</span> health; it hits for <span class="num">20</span></li>
-				<li>Dead players respawn after <span class="num">8 s</span> (placeholder)</li>
+				<li>In the test room, dead players respawn after <span class="num">8 s</span> (placeholder)</li>
+				<li>In the maze you stay down until a teammate revives you</li>
 			</ul>
 		</div>
 	</div>
@@ -252,6 +273,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Right click</td><td>Throw what you're carrying</td></tr>
 		<tr><td>Scroll while carrying</td><td>Push it away or pull it closer</td></tr>
 		<tr><td><kbd>E</kbd></td><td>Press a button, or screw on a spare filter</td></tr>
+		<tr><td>Hold <kbd>E</kbd></td><td>Revive a downed teammate (<span class="num">3 s</span>, in the maze)</td></tr>
 		<tr><td><kbd>F2</kbd>–<kbd>F6</kbd></td><td>Switch visual effects on and off to compare looks</td></tr>
 		<tr><td><kbd>F7</kbd></td><td>Turn all sound off and on again</td></tr>
 		<tr><td><kbd>Esc</kbd></td><td>Free the mouse, leave the game</td></tr>
@@ -273,11 +295,11 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Round loop</td><td><span class="pill leaning">Leaning</span></td><td>Deploy, research, extract, hand in, upgrade</td></tr>
 		<tr><td>Art style</td><td><span class="pill leaning">Leaning</span></td><td>Mid-poly, comic-book shading, grainy camera</td></tr>
 		<tr><td>Classes</td><td><span class="pill leaning">Leaning</span></td><td>Each scientist type brings a kit; only the Scientist exists</td></tr>
-		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health, timed respawn as a stand-in</td></tr>
+		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health; timed respawn in the test room, teammate revive in the maze</td></tr>
 		<tr><td>Mind vs body damage</td><td><span class="pill leaning">Leaning</span></td><td>One health pool; mind damage can't kill you</td></tr>
 		<tr><td>Characters that rust</td><td><span class="pill leaning">Leaning</span></td><td>Benched characters get worse</td></tr>
 		<tr><td>Rat lore</td><td><span class="pill idea">Idea</span></td><td>You are a rat with a human brain</td></tr>
-		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research</td></tr>
+		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research. The maze is being built first</td></tr>
 		<tr><td>Selling</td><td><span class="pill open">Open</span></td><td>Does selling stay at all? The black market idea is on hold</td></tr>
 		<tr><td>Research tree</td><td><span class="pill idea">Idea</span></td><td>Factorio-style, between rounds</td></tr>
 		<tr><td>Prestige</td><td><span class="pill idea">Idea</span></td><td>Phasmophobia-style rebirth</td></tr>
@@ -288,7 +310,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <section id="next">
 	<h2>What we're deciding next</h2>
-	<p>The maze is in progress (next: chain chambers together, then add the evil guy to them). After that, pick one:</p>
+	<p>The maze run comes first (see <a href="#now">Working on now</a>). After that, pick one:</p>
 	<div class="table"><table>
 		<tr><th>Option</th><th>What it gets us</th></tr>
 		<tr><td>Loot + round loop ★</td><td>Recommended. Turns the tech demo into a game: loot with value that loses money when it breaks, an extraction point, a timer and a payout.</td></tr>
@@ -304,7 +326,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<ul class="questions">
 		<li><span class="label">Loot</span><span>Does loot have a value that drops when it gets damaged? Is there research you don't carry (photos, recordings, readings)?</span></li>
 		<li><span class="label">Selling</span><span>Does selling stay now that the game is about research and testing? What does research earn you? If the black market stays, how do you get caught and who pays the fine?</span></li>
-		<li><span class="label">Death</span><span>Timed respawn, a teammate revives you, or out for the round? What exactly do you lose?</span></li>
+		<li><span class="label">Death</span><span>The maze uses teammate revive now. Should the rest of the game too? What exactly do you lose when you die?</span></li>
 		<li><span class="label">Healing</span><span>Right now only respawning heals. Should anything else?</span></li>
 		<li><span class="label">Characters</span><span>Which abilities get rusty, how fast, and can you train them back? Are upgrades per character or shared?</span></li>
 		<li><span class="label">Classes</span><span>Which other scientist types exist, and what do they carry?</span></li>
@@ -313,7 +335,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><span class="label">Readability</span><span>Do the cracks and HUD glitches read clearly enough to drop the debug bars?</span></li>
 		<li><span class="label">Lore</span><span>What is the evil guy, to a rat? How does the madness build and go away?</span></li>
 		<li><span class="label">Modes</span><span>What do payload and research play like? Picked per round, per run, or voted?</span></li>
-		<li><span class="label">Maze</span><span>How many rooms? Does the whole team dying end it?</span></li>
+		<li><span class="label">Maze</span><span>Is three chambers the right length for a run? For now, everyone being down at once fails the run: is that right?</span></li>
 		<li><span class="label">Monsters</span><span>What can monster players do, how many per match, phone or PC?</span></li>
 		<li><span class="label">Look</span><span>Keep the grain if we keep the comic-book shading?</span></li>
 		<li><span class="label">Name</span><span>"RND" is a working title. What's the real one?</span></li>
@@ -343,10 +365,11 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li>Names above players show numbers, not names (also comes with Steam).</li>
 		<li>Walking into props doesn't push them; you have to grab them.</li>
 		<li>No crouching or stamina yet.</li>
-		<li>Death is a placeholder: you tip over and come back after 8 seconds.</li>
+		<li>Death is a placeholder: you tip over. In the test room you come back after 8 seconds.</li>
 		<li>Only one creature type, and it can drop down ledges but can't jump up.</li>
 		<li>Sounds are placeholders, tuned by numbers rather than by ear.</li>
-		<li>Solving the test chamber doesn't lead anywhere yet. There's only one.</li>
+		<li>Finishing a maze run earns nothing yet: after the result screen, a new run starts.</li>
+		<li>Every run plays the same three chambers in the same order, and the two new ones haven't been playtested.</li>
 		<li>The chamber's plates, buttons and doors haven't been tested with several players yet, and they don't have their own sounds.</li>
 		<li>If the game acts strangely right after pulling new code, close Godot completely and reopen it.</li>
 	</ul>
@@ -387,6 +410,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<dt>Mental damage</dt><dd>Damage to your mind rather than your body. Scrambles the HUD instead of cracking the glass, and can't kill you.</dd>
 		<dt>Psychosis</dt><dd>Working name for seeing the truth: you and your friends look like rats.</dd>
 		<dt>Test chamber</dt><dd>One puzzle room in the maze mode.</dd>
+		<dt>Maze run</dt><dd>Three test chambers in a row, easiest first. Pass them all to pass the run; if everyone is down at once, the run fails.</dd>
 		<dt>Kit</dt><dd>The items a scientist type carries in hotbar slots 2–5.</dd>
 		<dt>Host</dt><dd>The player whose game everyone else joins.</dd>
 		<dt>Grey-box</dt><dd>A level made of plain blocks to test gameplay before art.</dd>

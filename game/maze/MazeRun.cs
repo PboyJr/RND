@@ -89,10 +89,20 @@ public partial class MazeRun : Node
 	private void NextChamber()
 	{
 		Chamber++;
-		// ponytail: random pick from the pool, so with one chamber it just repeats. Pick by difficulty
-		// (DESIGN: ramp through the run, start from the party's level) once there are more chambers.
-		GetParent<Main>().ChangeLevel(Chambers[GD.RandRange(0, Chambers.Count - 1)]);
+		GetParent<Main>().ChangeLevel(PickChamber());
 		Broadcast();
+	}
+
+	// Chambers are listed easiest first, and a run climbs the list: its first chamber is the easiest,
+	// its last the hardest. Between two chambers of the list, it picks one at random, leaning to the
+	// nearer, so a longer list gives varied runs.
+	// ponytail: the ramp always starts at the easiest. Start from the party's level (DESIGN) once
+	// there are player levels.
+	private PackedScene PickChamber()
+	{
+		float step = Length <= 1 ? 0f : (float)Chamber * (Chambers.Count - 1) / (Length - 1);
+		int index = Mathf.FloorToInt(step) + (GD.Randf() < step - Mathf.Floor(step) ? 1 : 0);
+		return Chambers[Mathf.Clamp(index, 0, Chambers.Count - 1)];
 	}
 
 	private void Finish(RunResult result)

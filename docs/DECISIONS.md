@@ -605,6 +605,22 @@ release. Checking the path is the general fix: it also covers rooms behind shut 
 **How we verified it:** the smoke test watches the released evil guy for 6 s and fails if he
 ever heads for a spot he can't reach. Against the old code it fails with a spot on the roof.
 
+## 2026-09-25: Chambers are listed easiest first, and a run climbs the list
+
+**Decision:** `MazeRun.Chambers` (on `Main`) is in difficulty order, with no separate difficulty
+tag. Chamber *k* of a run sits at position `k × (chambers − 1) / (length − 1)` along the list. When
+that falls between two chambers it picks one at random, weighted to the nearer. So a 3-chamber run
+over 3 chambers is always easiest → hardest, and adding chambers makes runs vary without code
+changes. New chambers go in `maze/` as ordinary levels, and in `Main`'s `LevelSpawner` list.
+
+**Why:** a list order is the smallest thing that gives a ramp. A per-chamber difficulty number
+only earns its place once chambers are assembled from modules, or picked from a big pool.
+
+**How we verified it:** the smoke test runs every chamber in the list (spawn, the evil guy can
+reach the start, the exit is shut). It solves the new two with props, including a jar thrown at a
+real throw's speed from the exit door onto the ledge button. It checks that a 2-chamber run is the
+easiest chamber, then the hardest.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:

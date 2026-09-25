@@ -26,7 +26,8 @@ update the matching doc in the same turn:
 The markdown docs are Claude's working notes. **`docs/overview.html` is the team's plain-English
 handbook** (no class names, file paths or code terms), published as an Artifact the team shares.
 When a change would alter something it says (a status tag, what's playable, controls, open
-questions, next steps), update it too, bump its date, and republish it.
+questions, next steps), update it too, bump its date, and republish it. Its **Working on now**
+section says what's in progress: update it whenever the current task starts, changes or finishes.
 
 ## Working in the code
 
