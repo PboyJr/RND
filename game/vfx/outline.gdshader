@@ -8,7 +8,10 @@ render_mode unshaded, fog_disabled, depth_test_disabled, depth_draw_never, cull_
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_nearest;
 uniform sampler2D normal_texture : hint_normal_roughness_texture, filter_nearest;
-uniform vec3 line_color : source_color = vec3(0.015, 0.015, 0.02);
+uniform vec3 line_color : source_color = vec3(0.0, 0.0, 0.0);
+// How much the line covers what's behind it. Below 1, a black line just darkens the surface under it,
+// so it takes on the wall's own colour and light instead of being a flat stark stroke.
+uniform float line_opacity : hint_range(0.0, 1.0) = 0.55;
 // Line width in pixels (1 = thinnest).
 uniform float thickness : hint_range(1.0, 4.0, 1.0) = 1.0;
 // Depth jump that counts as an edge, as a fraction of the distance (so far walls don't all outline).
@@ -52,5 +55,5 @@ void fragment() {
 	float edge = max(step(depth_threshold * depth, depth_jump), step(normal_threshold, normal_jump));
 	edge *= 1.0 - smoothstep(fade_distance * 0.5, fade_distance, depth);
 	ALBEDO = line_color;
-	ALPHA = edge;
+	ALPHA = edge * line_opacity;
 }

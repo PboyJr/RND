@@ -8,7 +8,7 @@ namespace RND.UI;
 
 /// <summary>
 /// The crisp overlay outside the mask: pause menu, death message, session status, a deliberately
-/// unstyled debug readout of health and filter, and debug hotkeys that switch parts of the look on
+/// unstyled debug readout of health (total), mental damage (purple bar) and filter, and debug hotkeys that switch parts of the look on
 /// and off to compare. (The real health bar is the visor's cracks, and the in-mask HUD is VisorHud.)
 /// </summary>
 public partial class Hud : Control
@@ -24,6 +24,7 @@ public partial class Hud : Control
 	private Label _status;
 	private Control _pauseMenu;
 	private ProgressBar _debugHealth;
+	private ProgressBar _debugMental;
 	private Label _debugFilter;
 	private Label _deathLabel;
 	private double _respawnAt;
@@ -36,6 +37,7 @@ public partial class Hud : Control
 		_status = GetNode<Label>("Status");
 		_pauseMenu = GetNode<Control>("PauseMenu");
 		_debugHealth = GetNode<ProgressBar>("DebugHealth");
+		_debugMental = GetNode<ProgressBar>("DebugMental");
 		_debugFilter = GetNode<Label>("DebugFilter");
 		_deathLabel = GetNode<Label>("DeathLabel");
 		_viewTogglesList = GetNode<Label>("ViewToggles");
@@ -79,12 +81,14 @@ public partial class Hud : Control
 		_status.Text = $"{(Multiplayer.IsServer() ? "Hosting" : "Connected")}  ·  {playerCount} in session";
 
 		Player local = Player.Local;
-		_debugHealth.Visible = _debugFilter.Visible = local != null;
+		_debugHealth.Visible = _debugMental.Visible = _debugFilter.Visible = local != null;
 		if (local == null)
 			return;
 
 		_debugHealth.MaxValue = local.Health.MaxHealth;
 		_debugHealth.Value = local.Health.Current;
+		_debugMental.MaxValue = local.Health.MaxHealth; // how much of the lost health is mental
+		_debugMental.Value = local.Health.Mental;
 		_debugFilter.Text = $"filter {Mathf.CeilToInt(local.Respirator.Fraction * 100f)}% ({Mathf.CeilToInt(local.Respirator.Remaining)} s)";
 
 		if (local.IsDead && !_wasDead)

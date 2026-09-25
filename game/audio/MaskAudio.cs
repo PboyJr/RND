@@ -40,7 +40,7 @@ public partial class MaskAudio : Node
 		Player player = Player.Local;
 		float health = player == null ? 1f : player.Health.Current / player.Health.MaxHealth;
 
-		float damage = 1f - health;
+		float damage = player == null ? 0f : 1f - player.Health.Physical / player.Health.MaxHealth; // only cracks let sound in
 		_muffle.CutoffHz = player == null ? 20000f : Mathf.Lerp(SealedCutoffHz, ShatteredCutoffHz, damage * damage);
 
 		if (player != null)
@@ -65,7 +65,9 @@ public partial class MaskAudio : Node
 			Exertion = player.Breathing.Exertion,
 			Choke = player.Breathing.Choke,
 			FilterWear = 1f - player.Respirator.Fraction,
-			Danger = Mathf.Clamp((0.5f - health) / 0.5f, 0f, 1f),
+			// Kicks in audibly the moment you drop under half health, then builds to nearly dead.
+			Danger = health < 0.5f ? Mathf.Lerp(0.35f, 1f, (0.5f - health) / 0.5f) : 0f,
+			Mind = player.Health.Mental / player.Health.MaxHealth,
 		});
 		_playback.PushBuffer(_buffer);
 	}

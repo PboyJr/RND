@@ -34,6 +34,47 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 - **Psychosis** (working name): the longer you stay in the maze, the more likely you are to get a
   status effect that makes you and your friends **look like rats**. It feels like a
   hallucination, but it's actually the truth.
+- **Clues, not exposition** (`Decided`, 2026-09-25): the lore is never spoonfed. No text, HUD or
+  announcer states the twist. Players piece it together from clues they notice (the huge
+  observation window, psychosis, odd details in chambers) and have to think about what they mean.
+- **The mask is the lie** (`Idea`, 2026-09-25, brainstorm): the "filter" doesn't clean the air.
+  It works more like a scuba regulator, feeding you a gas that keeps you sane: it keeps up the
+  illusion that you and your friends are humans. The player is never told; the clues:
+  - **The hiss goes the wrong way.** A fresh canister already hisses when it seats: it's
+    pressurised, pushing gas *in*. Canisters could have no intake holes, just a valve.
+  - **Running low lets the truth in.** Low filter = psychosis creeping in: a teammate flickers
+    into a rat for a frame, door frames look too tall, voices squeak at the edges. It reads as a
+    scary glitch, not an explanation. This merges the filter and psychosis into one system.
+  - **Swapping is a moment of truth.** If swapping takes time (already an idea), the few seconds
+    with the canister off are when you see the most.
+  - **The maze rations the gas.** Fewer spares in the maze (or something in the vents that
+    cancels the dose) is why psychosis builds up there.
+  - **The truth is useful** (risk / reward): running low could show what only a rat would notice,
+    like scent trails, rat-sized gaps and vents, so players might *choose* to let it run down.
+  - Keeps the name "filter" on the HUD and canisters. The lie is in the labelling.
+  - **How it runs out** (`Leaning`, 2026-09-25):
+    - **Below 15% gas you start taking very low mental damage** (withdrawal; in the prototype):
+      0.5 HP/s just under 15%, rising to 1.5 HP/s once the filter's spent, in 1 s ticks.
+    - **Running out fully doesn't flip you straight to the truth.** Psychosis takes a while to set
+      in (*suggestion:* 20–30 s, getting stronger), so there's a window to find a spare.
+    - **It's per player and desyncs** (`Leaning`): you might see your friend as a rat while they
+      still see you as a human. What you see depends on your own gas, not theirs.
+  - **Mental vs physical damage** (`Leaning`, in the prototype 2026-09-25): one health pool, and
+    each hit is physical or mental. Physical cracks the glass and flashes your body. Mental leaves
+    the glass alone and corrupts the projected HUD instead (eased in: barely there at low mental
+    damage, strong near the end): text scrambles, bands of it tear
+    sideways, it browns out (sags dim for a second or so and recovers), and the phosphor green goes
+    sickly. **Past 50% mental, the HUD fades away** (gone by ~90%) and turns into a heavy vignette:
+    a failing mind loses information. **The cracks turn to blood** as it gets worse (from ~20%, full
+    by ~90%): the same impacts, in the same places and sizes, become splatters with droplets and
+    drips, the hairlines running dark red. A clue, not an explanation: whose blood, and was the glass
+    ever cracked? Open: losing the crosshair with the HUD makes grabbing hard; keep it? Your vision also
+    narrows a little and a thin tinnitus ring comes in. So "how hurt am I" is cracks plus HUD
+    corruption. Withdrawal is the only mental damage so far. **A fresh filter stops withdrawal but
+    heals nothing:** health and sanity only come back on respawn for now (Open: healing, later). A purple debug bar shows how much of
+    the lost health is mental.
+  - `Open`: is everything you see while low real, or is some of it hallucination to muddy the
+    clues? What is the evil guy when you see the truth? (Not deciding yet.)
 - **Why you keep upgrades when you die** (`Leaning`, 2026-09-25): you're the real scientist,
   sitting outside the test, with your brain uploaded into a rat. When the rat dies, *you* don't,
   so you keep (some of) your upgrades. That's the difference from REPO, where dying and the round
@@ -117,11 +158,12 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
     releases something if you're too loud. It reuses `EmitSound`, so noise is both tool and risk.
 - **Pressure:** the filter keeps draining, so a slow chamber costs air; spare filters are placed
   in chambers as rewards. **Psychosis** builds the longer you're in the maze.
-- **The control group:** every chamber has a **rat par time**, how long a real rat took. The
-  point of the test is beating it. Beating par pays more; the prize at the exit is **cheese**
-  (the experimenters' idea of a reward), which converts to money / research.
 - **The experimenters talk** (GLaDOS-ish): short, clinical PA announcements, maybe shown on the
-  visor, that get stranger as psychosis sets in.
+  visor, that get stranger as psychosis sets in. They never say what you are.
+- **No "beat the rat" readout** (`Decided`, 2026-09-25): the visor only shows the test clock and
+  "test complete". Comparing you to rats would give the twist away (see Lore → clues, not
+  exposition). Any rat benchmark stays hidden, or shows up only as a clue (a chart on a wall
+  with an unlabelled "control" line, say).
 - **Intelligent and dynamic:** the experimenters **adapt the test**. Solve too fast and the next
   chamber gets harder (fewer props, a monster released); struggle and they "help" in
   condescending ways. Later: chambers assembled from modules instead of hand-built.
@@ -248,12 +290,15 @@ it coming from the sides.
   mask.
 - **Breath fog** pools low around your mouth and pulses with each exhale. Breathing speeds up
   and fogs more when you sprint, and stays heavy for a few seconds after. A tired filter leaves
-  the mask clammier.
+  the mask clammier. (Halved 2026-09-25: it was too much.)
 - **The mask sways**: the rim lags a little behind where you look and jolts when you're hit.
 - **The HUD is projected onto the glass** in phosphor green (hotbar, hints, crosshair, filter
   gauge), so it curves, glows, flickers and gets split by cracks along with the visor.
+- **Nothing on the visor flashes on and off** (2026-09-25). Warnings ease instead: the filter gauge
+  fades as it runs low (the spent warning is back at full strength), mental damage browns the HUD
+  out, and running out of gas closes in a steady vignette.
 - Outside the mask, crisp and **deliberately unstyled**: a debug health bar (Godot's default
-  progress bar, showing %) and a filter readout. Remove these once the cracks read well in
+  progress bar, showing %), a purple debug bar for mental damage and a filter readout. Remove these once the cracks read well in
   playtests.
 
 ### Mask audio (`Decided` for the prototype, sounds still tuning by ear)
@@ -266,7 +311,8 @@ Half the gas mask illusion is sound. Everything is generated in code, so there a
     around you. Atmosphere only, since enemies don't react to them.
   - **Reverb:** a concrete-room echo on every world sound, heard *through* the mask, so the
     echoes come through dull and distant too.
-  - **Balance:** calm breathing sits just under the room tone. Your body only takes over when
+  - **Balance:** calm breathing is barely there, about 15 dB under the room tone (2026-09-25).
+    You don't notice it until the room goes quiet and you actually listen, and then it's there. Your body only takes over when
     things go wrong (choking, heartbeat).
 - **You hear yourself breathe, and it matches the fog.** A warm, low "hoo" out through the exhale
   valve, a breathier draw in through the filter, a faint rubber valve flap at each turn of breath,
@@ -274,8 +320,10 @@ Half the gas mask illusion is sound. Everything is generated in code, so there a
   every fog puff lands on an exhale you hear.
   - Faster and louder with effort, and stays heavy after a sprint.
   - **Wheezes and whistles as the filter wears out**, so you can *hear* it running down.
-  - Ragged gasping when you're choking.
-- **Heartbeat** fades in below 50% health: a lub-dub that speeds up as you get closer to death.
+  - **Out of gas, you breathe less, not more** (2026-09-25): like an empty scuba tank. Slow,
+    uneven breaths (about one every 3 s, never evenly spaced), each a strained pull against a valve
+    that gives nothing, with a short weak exhale and the air coming in catches.
+- **Heartbeat** kicks in, clearly audible, the moment you drop below 50% health: a lub-dub that speeds up as you get closer to death.
 - **Fresh filter:** a click as it seats, then a rush of air (inside your mask), plus a hiss nearby
   enemies can hear.
 - **The world is muffled by your mask**, and **cracks let sound in**: an intact mask muffles
@@ -290,12 +338,16 @@ Half the gas mask illusion is sound. Everything is generated in code, so there a
 
 ### The filter (`Decided` for the prototype, numbers still tuning)
 
-The mask's filter runs out, and that's a core pressure mechanic.
+The mask's filter runs out, and that's a core pressure mechanic. (`Idea`: it isn't really a
+filter, see Lore → "The mask is the lie".)
 
 - A fresh filter lasts **180 s** of calm breathing. It drains at **0.6×** standing still and up
   to **2.5×** sprinting flat out, so **sprinting burns air**.
-- **Spent filter = choking:** 4 damage every 0.5 s (so the cracks spread), vision closes in and
-  pulses red, and the fog goes thick.
+- **Low filter = withdrawal:** below 15% you take mental damage (0.5 → 1.5 HP/s as it runs out),
+  which corrupts the HUD instead of cracking the glass (see Lore → "The mask is the lie").
+  **Spent filter:** on top of that your breathing goes slow and ragged, a steady vignette closes in
+  (no pulsing) with a red tint, and the fog goes
+  thick. (Was 4 physical damage every 0.5 s until 2026-09-25.)
 - **Spare filter canisters** are physical props. Carry them, throw one to a teammate, press
   **[E]** on one (or while holding it) to screw it on. A fresh filter **hisses**, which the evil
   guy can hear within 4 m.
@@ -394,4 +446,5 @@ The mask's filter runs out, and that's a core pressure mechanic.
 - [ ] Do the cracks read clearly enough to drop the debug health bar?
 - [ ] Game modes: which ones, and what does each play like? (see Game modes)
 - [ ] Dying: which upgrades do you keep, and what goes down with the rat?
+- [ ] Mental damage: does the HUD corruption read clearly enough in play? (see Lore → "The mask is the lie")
 - [ ] Rat lore: does it replace or reframe the "researchers selling evidence" pitch? (see Lore)

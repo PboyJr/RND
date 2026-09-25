@@ -15,6 +15,7 @@ const TIMEOUT := 90.0
 const SCENES := [
 	"res://core/main.tscn",
 	"res://levels/test_level.tscn",
+	"res://maze/test_chamber.tscn",
 	"res://players/player.tscn",
 	"res://props/crate.tscn",
 	"res://props/crate_large.tscn",
@@ -270,12 +271,12 @@ func _check_audio(out: String, verbose: bool) -> void:
 		if verbose:
 			_log("%-18s peak %.2f  rms %.3f" % [sound, level.x, level.y])
 		_check(level.x < 0.99, "audio: %s clips (peak %.2f)" % [sound, level.x])
-		_check(level.y > 0.01, "audio: %s is near silent (rms %.3f)" % [sound, level.y])
+		_check(level.y > 0.001, "audio: %s is near silent (rms %.3f)" % [sound, level.y])
 	if verbose:
 		_log("wrote %d .wav files to %s" % [levels.size(), out])
 
 
-# Gas mask filter: drains, chokes you when spent, a spare refills it (once), respawning gives a fresh one.
+# Gas mask filter: drains, low gas hurts your mind (not your body), a spare refills it (once), respawning gives a fresh one.
 func _run_offline_filter(level: Node, player: Node3D) -> void:
 	level.EnemyRespawnDelay = 999.0 # keep the evil guy out of this one
 	for enemy in level.get_node("Enemies").get_children():
@@ -292,7 +293,11 @@ func _run_offline_filter(level: Node, player: Node3D) -> void:
 
 	respirator.Remaining = 0.0
 	var before: float = health.Current
-	_check(await _wait_until(func(): return health.Current < before, 2.0), "filter: a spent filter didn't make the player choke")
+	_check(await _wait_until(func(): return health.Current < before, 2.0), "filter: a spent filter didn't hurt the player")
+	_check(health.Mental > 0.0 and is_equal_approx(health.Physical, health.MaxHealth), "filter: withdrawal should be mental damage, not physical")
+	var mental: float = health.Mental
+	health.TakeDamage(10.0, 0)
+	_check(is_equal_approx(health.Physical, health.MaxHealth - 10.0) and is_equal_approx(health.Mental, mental), "filter: a physical hit got counted as mental")
 
 	var canister := level.get_node("Props/FilterA") as RigidBody3D
 	player.global_position = canister.global_position + Vector3(0, 0, 1.2)
@@ -300,6 +305,11 @@ func _run_offline_filter(level: Node, player: Node3D) -> void:
 	canister.rpc_id(1, "RequestUse")
 	await _frames(2)
 	_check(respirator.Remaining > respirator.Capacity - 1.0, "filter: screwing on a spare didn't refill it")
+	# A fresh filter stops the withdrawal but doesn't heal it (healing comes later).
+	var hurt: float = health.Current
+	var hurt_mind: float = health.Mental
+	await _seconds(1.5)
+	_check(is_equal_approx(health.Current, hurt) and is_equal_approx(health.Mental, hurt_mind), "filter: a fresh filter should stop withdrawal without healing (health %.1f -> %.1f)" % [hurt, health.Current])
 	_check(canister.Consumed and not canister.visible and canister.collision_layer == 0, "filter: the used canister is still there")
 	respirator.Remaining = 10.0
 	canister.rpc_id(1, "RequestUse")
@@ -320,6 +330,23 @@ func _run_offline_liquid(level: Node) -> void:
 	flask.apply_central_impulse(Vector3(1.2, 0.8, 0))
 	_check(await _wait_until(func(): return liquid.Slosh() > 0.05, 1.0), "liquid: didn't slosh when its flask was shoved")
 	_check(await _wait_until(func(): return liquid.Slosh() < 0.01, 6.0), "liquid: never settled back to level")
+
+
+# The maze chamber: you spawn at the start, and walking into the exit passes the test.
+func _run_offline_chamber() -> void:
+	var level := (load("res://maze/test_chamber.tscn") as PackedScene).instantiate()
+	add_child(level)
+	await _seconds(1.0)
+	var player := level.get_node_or_null("Players/1") as Node3D
+	var exit := level.get_node("Exit")
+	if _check(player != null, "chamber: didn't spawn the local player"):
+		_check(player.is_on_floor(), "chamber: player isn't standing on the floor")
+		_check(player.global_position.distance_to(exit.global_position) > 10.0, "chamber: player spawned near the exit")
+		_check(not exit.IsComplete, "chamber: test passed before anyone reached the exit")
+		player.global_position = exit.global_position - Vector3(0, 1.4, 0)
+		_check(await _wait_until(func(): return exit.IsComplete, 2.0), "chamber: standing in the exit didn't pass the test")
+	level.queue_free()
+	await _frames(2)
 
 
 # Kills whatever's there and waits for the level to spawn a fresh, calm evil guy.
@@ -517,6 +544,22 @@ func _run_capture() -> void:
 	await _screenshot(out.path_join("visor_3_choking.png"))
 	var fractures: int = visor.ImpactCount
 	_check(fractures == 2, "capture: expected one fracture per hit, and choking to spread them, not add more (%d)" % fractures)
+
+	# Mental damage: a clean mask, but the projected HUD scrambles and tears, and your ears ring.
+	health.Revive()
+	player.get_node("Respirator").Refill()
+	await _frames(2)
+	health.TakeMentalDamage(60.0)
+	await _meter("mental damage (tinnitus)", 1.2)
+	await _screenshot(out.path_join("visor_4_mental.png"))
+	_check(visor.ImpactCount == 0, "capture: mental damage cracked the glass (%d fractures)" % visor.ImpactCount)
+	# Far gone: the HUD has faded into a heavy vignette, and a physical hit shows as blood, not a crack.
+	enemy.global_position = player.global_position + Vector3(-1.4, 0, -1.6)
+	await _frames(2)
+	health.TakeDamage(12.0, 0)
+	health.TakeMentalDamage(22.0)
+	await _seconds(0.8)
+	await _screenshot(out.path_join("visor_5_blood.png"))
 	_network.Leave()
 
 

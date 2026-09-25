@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using RND.Core;
 
@@ -9,6 +10,7 @@ public partial class MainMenu : Control
 	private Button _host;
 	private Button _join;
 	private Label _status;
+	private OptionButton _level;
 
 	public override void _Ready()
 	{
@@ -16,10 +18,21 @@ public partial class MainMenu : Control
 		_host = GetNode<Button>("%Host");
 		_join = GetNode<Button>("%Join");
 		_status = GetNode<Label>("%Status");
+		_level = GetNode<OptionButton>("%Level");
 
 		_host.Pressed += OnHostPressed;
 		_join.Pressed += OnJoinPressed;
 		_address.TextSubmitted += _ => OnJoinPressed();
+	}
+
+	/// <summary>The index into Main.Levels the host will load.</summary>
+	public int SelectedLevel => Mathf.Max(_level.Selected, 0);
+
+	public void SetLevels(IEnumerable<string> names)
+	{
+		_level.Clear();
+		foreach (string name in names)
+			_level.AddItem(name);
 	}
 
 	public void Open(string message)

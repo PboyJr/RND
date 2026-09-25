@@ -8,9 +8,9 @@ namespace RND.Vfx;
 
 /// <summary>
 /// Drives the full-screen visor shader (vfx/visor.gdshader) from the local player: cracks from hits
-/// (the health bar), breath fog from the player's Breathing (the same rhythm you hear) and filter
-/// wear, choking from a spent filter, sway from looking around, flashes from hits. Also keeps the
-/// projected-HUD viewport the same size as the screen.
+/// (physical health), a corrupted HUD from mental damage, breath fog from the player's Breathing (the
+/// same rhythm you hear) and filter wear, choking from a spent filter, sway from looking around, flashes
+/// from hits. Also keeps the projected-HUD viewport the same size as the screen.
 /// </summary>
 public partial class Visor : ColorRect
 {
@@ -78,9 +78,11 @@ public partial class Visor : ColorRect
 		if (player == null)
 			return;
 
-		// The glass is the health bar: every hit fractures it, and the weaker the mask, the further
-		// all the cracks run. A fresh mask (respawn) is instantly clean.
-		float health = player.Health.Current;
+		// The glass is the (physical) health bar: every hit fractures it, and the weaker the mask, the
+		// further all the cracks run. A fresh mask (respawn) is instantly clean. Mental damage doesn't
+		// crack anything: it corrupts the projected HUD instead, and the worse it gets the more the cracks look
+		// like blood (mind).
+		float health = player.Health.Physical;
 		float targetDamage = 1f - health / player.Health.MaxHealth;
 		_damage = targetDamage < _damage ? targetDamage : Mathf.MoveToward(_damage, targetDamage, dt * 3f);
 		if (health < _lastHealth)
@@ -101,7 +103,7 @@ public partial class Visor : ColorRect
 		Breathing breathing = player.Breathing;
 		float exhale = breathing.Exhale;
 		float clammy = (1f - player.Respirator.Fraction) * 0.25f;
-		float fog = 0.04f + clammy + exhale * exhale * Mathf.Lerp(0.15f, 0.55f, breathing.Exertion) + breathing.Choke * 0.3f;
+		float fog = 0.02f + clammy + exhale * exhale * Mathf.Lerp(0.075f, 0.275f, breathing.Exertion) + breathing.Choke * 0.3f;
 
 		// Sway: the rim lags behind where you look.
 		float yaw = player.Rotation.Y;
@@ -115,6 +117,8 @@ public partial class Visor : ColorRect
 		_material.SetShaderParameter("damage", _damage);
 		_material.SetShaderParameter("fog", Mathf.Clamp(fog, 0f, 1f));
 		_material.SetShaderParameter("choke", breathing.Choke);
+		float mind = player.Health.Mental / player.Health.MaxHealth;
+		_material.SetShaderParameter("mind", mind); // the shader eases it (same curve as VisorHud)
 		_material.SetShaderParameter("hit_flash", _hitFlash);
 		_material.SetShaderParameter("sway", _sway);
 	}
@@ -125,8 +129,8 @@ public partial class Visor : ColorRect
 		if (player == null)
 			return;
 
-		_damage = 1f - player.Health.Current / player.Health.MaxHealth;
-		_lastHealth = player.Health.Current;
+		_damage = 1f - player.Health.Physical / player.Health.MaxHealth;
+		_lastHealth = player.Health.Physical;
 		_lastYaw = player.Rotation.Y;
 		_lastPitch = player.SyncPitch;
 		_sway = Vector2.Zero;

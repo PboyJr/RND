@@ -4,19 +4,23 @@ namespace RND.Combat;
 
 /// <summary>
 /// The gas mask's filter. Host-owned and replicated, like Health: add it as a child named
-/// "Respirator" with a MultiplayerSynchronizer. It drains faster the harder you breathe; once it's
-/// spent you choke (damage in gasps) until you screw on a spare.
+/// "Respirator" with a MultiplayerSynchronizer. It drains faster the harder you breathe. Running low
+/// hurts your mind, not your body: withdrawal (mental damage, see Health) starts at LowGasFraction and
+/// gets worse until you screw on a spare.
 /// </summary>
 public partial class Respirator : Node
 {
 	// Seconds of calm breathing a fresh filter lasts.
-	[Export] public float Capacity { get; set; } = 180f;
+	[Export] public float Capacity { get; set; } = 30f; // 180 normally; 30 while testing withdrawal
 	// Filter-seconds used per second: standing still vs. sprinting flat out.
 	[Export] public float CalmDrain { get; set; } = 0.6f;
 	[Export] public float ExertedDrain { get; set; } = 2.5f;
-	// Choking on a spent filter: damage per gasp, and time between gasps.
-	[Export] public float ChokeDamage { get; set; } = 4f;
-	[Export] public float ChokeInterval { get; set; } = 0.5f;
+	// Withdrawal: starts below this much gas, and deals this much mental damage per second, from
+	// MinWithdrawal just under the threshold up to MaxWithdrawal once the filter's spent. In ticks.
+	[Export] public float LowGasFraction { get; set; } = 0.15f;
+	[Export] public float MinWithdrawal { get; set; } = 0.5f;
+	[Export] public float MaxWithdrawal { get; set; } = 1.5f;
+	[Export] public float WithdrawalInterval { get; set; } = 1f;
 
 	/// <summary>Filter-seconds left. Replicated from the host; change it with Breathe / Refill (host only).</summary>
 	[Export]
@@ -31,7 +35,7 @@ public partial class Respirator : Node
 
 	// -1 = not set yet (spawn replication can set it before _Ready), same trick as Health.
 	private float _remaining = -1f;
-	private float _chokeTimer;
+	private float _withdrawalTimer;
 
 	/// <summary>Host only. Exertion: 0 = standing still, 1 = sprinting.</summary>
 	public void Breathe(float delta, float exertion, Health health)
@@ -40,18 +44,19 @@ public partial class Respirator : Node
 			return;
 
 		Remaining = Mathf.Max(0f, Remaining - delta * Mathf.Lerp(CalmDrain, ExertedDrain, exertion));
-		if (!IsSpent)
+		if (Fraction >= LowGasFraction)
 		{
-			_chokeTimer = ChokeInterval; // the first gasp comes a beat after it runs out
+			_withdrawalTimer = WithdrawalInterval; // the first tick comes a beat after it drops below
 			return;
 		}
 
-		_chokeTimer -= delta;
-		if (_chokeTimer > 0f)
+		_withdrawalTimer -= delta;
+		if (_withdrawalTimer > 0f)
 			return;
 
-		_chokeTimer = ChokeInterval;
-		health.TakeDamage(ChokeDamage, 0);
+		_withdrawalTimer = WithdrawalInterval;
+		float perSecond = Mathf.Lerp(MaxWithdrawal, MinWithdrawal, Fraction / LowGasFraction);
+		health.TakeMentalDamage(perSecond * WithdrawalInterval);
 	}
 
 	/// <summary>Host only.</summary>

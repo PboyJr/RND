@@ -20,6 +20,7 @@ uniform vec4 impacts[12];
 uniform int impact_count = 0;
 uniform float fog : hint_range(0.0, 1.0) = 0.0;       // breath condensation
 uniform float choke : hint_range(0.0, 1.0) = 0.0;     // spent filter: vision closes in
+uniform float mind : hint_range(0.0, 1.0) = 0.0;      // mental damage / max health: HUD corrupts, then fades; cracks turn to blood
 uniform float hit_flash : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 sway = vec2(0.0);                         // the mask lagging behind where you look
 uniform float glass_curve : hint_range(0.0, 0.3) = 0.06;
@@ -117,8 +118,9 @@ vec3 shards(vec2 q, float around, float seed, float outer) {
 // shards around it, and long cracks racing outward that bend and kink. Hairlines catch the light
 // unevenly and cast a dark refraction halo. Each shard sits slightly tilted, so it shows the world a
 // little askew and a little brighter or darker.
-// Returns (hairline, halo, shard shade), and nudges `shift` per shard.
-vec3 cracks(vec2 p, inout vec2 shift) {
+// Returns (hairline, halo, shard shade), and nudges `shift` per shard. `splat` gets the blood version
+// of each impact (a splatter with droplets and drips), which the mind shows instead as it goes.
+vec3 cracks(vec2 p, inout vec2 shift, inout float splat) {
 	vec3 result = vec3(0.0);
 	for (int i = 0; i < 12; i++) {
 		if (i >= impact_count) {
@@ -169,6 +171,21 @@ vec3 cracks(vec2 p, inout vec2 shift) {
 		float glint = 0.4 + 0.6 * value_noise(vec2(r * 30.0, angle * 3.0) + seed);
 		result.x = max(result.x, max(line * glint, crush));
 		result.y = max(result.y, max(halo * 0.6, crush * 0.5));
+
+		// Blood: a splat with a ragged edge where it struck, droplets flung around it, and drips
+		// running down from it. Sized like the fracture, so it still reads as how hurt you are.
+		float splat_r = 0.03 + 0.22 * size;
+		float ragged = value_noise(vec2(angle * 2.5, seed)) * 0.5 + value_noise(p * 30.0 + seed) * 0.2;
+		float blob = 1.0 - smoothstep(splat_r * (0.5 + ragged), splat_r * (0.56 + ragged), r);
+		vec2 drop_cell = p * 70.0;
+		float drop = step(0.9, hash12(floor(drop_cell) + seed)) * (1.0 - smoothstep(splat_r, splat_r * 2.4, r))
+			* (1.0 - smoothstep(0.2, 0.4, length(fract(drop_cell) - 0.5)));
+		float lane = floor(d.x * 45.0);
+		float drip_len = splat_r * (0.6 + 2.6 * hash12(vec2(lane, seed)));
+		float drip = step(0.55, hash12(vec2(lane, seed + 9.0))) * step(abs(d.x), splat_r * 0.75) * step(d.y, 0.0)
+			* (1.0 - smoothstep(0.15, 0.35, abs(fract(d.x * 45.0) - 0.5)))
+			* (1.0 - smoothstep(drip_len * 0.85, drip_len, -d.y));
+		splat = max(splat, max(blob, max(drop, drip)));
 	}
 	return result;
 }
@@ -186,9 +203,16 @@ void fragment() {
 
 	vec2 shift = vec2(0.0);
 	vec3 crack = vec3(0.0);
+	float splat = 0.0;
 	if (on > 0.0) {
-		crack = cracks(p, shift);
+		crack = cracks(p, shift, splat);
 	}
+
+	// How far gone the mind is. Glitches ease in (a little mental damage barely shows); past half,
+	// the HUD fades out into a heavy vignette, and the cracks turn more and more into blood.
+	float m = mind * mind;
+	float lost = smoothstep(0.5, 0.9, mind) * on;
+	float bloody = smoothstep(0.2, 0.9, mind) * on;
 
 	// Curved glass: a slight bulge, stronger toward the rim.
 	float lens = lens_on ? on : 0.0;
@@ -208,24 +232,41 @@ void fragment() {
 	col.b = textureLod(screen_texture, uv_glass - dir * fringe, blur).b;
 	col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2)) * 0.5 + 0.28), fogged * 0.55);
 
-	// Choking on a spent filter: vision closes in, pulsing with each gasp.
-	float gasp = 0.6 + 0.4 * sin(TIME * 7.0);
-	col *= mix(1.0, smoothstep(0.02, 0.55, gd), choke * gasp * on);
+	// Out of gas: a steady vignette closes in (no pulsing), with a slight red tint.
+	col *= mix(1.0, smoothstep(0.02, 0.55, gd), choke * 0.8 * on);
 	col = mix(col, vec3(dot(col, vec3(0.33))) * vec3(1.1, 0.6, 0.55), choke * 0.45 * on);
+
+	// Mental damage: vision narrows a little, then (past half) heavily, taking the HUD's place.
+	col *= mix(1.0, smoothstep(-0.15, 0.6, gd), m * 0.5 * on);
+	col *= mix(1.0, smoothstep(0.0, 0.85, gd), lost * 0.9);
 
 	// Projected HUD: rides on the glass (sway, shards), with a soft glow and a faint flicker.
 	vec2 uv_hud = uv - sway / to_visor + shift * 0.5;
+	// A damaged mind corrupts it: bands of the HUD tear sideways, it browns out, and the
+	// phosphor green goes sickly. (VisorHud also scrambles its text.)
+	float glitch_tick = floor(TIME * 12.0);
+	float band = floor(uv.y * 36.0);
+	float tear = step(1.0 - m * 0.5, hash12(vec2(band, glitch_tick)));
+	uv_hud.x += (hash12(vec2(glitch_tick, band + 7.0)) - 0.5) * 0.04 * tear;
+	// Brownouts: every so often the projection sags dim for a second or so and recovers. No flashing.
+	// Past half, it fades away for good.
+	float dropout = (1.0 - m * 0.75 * smoothstep(0.55, 0.85, value_noise(vec2(TIME * 0.7, 11.0)))) * (1.0 - lost);
 	vec4 hud = texture(hud_texture, uv_hud);
 	vec2 px = SCREEN_PIXEL_SIZE * 2.5;
 	vec4 glow = (texture(hud_texture, uv_hud + vec2(px.x, 0.0)) + texture(hud_texture, uv_hud - vec2(px.x, 0.0))
 		+ texture(hud_texture, uv_hud + vec2(0.0, px.y)) + texture(hud_texture, uv_hud - vec2(0.0, px.y))) * 0.25;
 	float flicker = 0.92 + 0.08 * hash12(vec2(floor(TIME * 24.0), 3.0));
-	float hud_on = glass * on * flicker * (1.0 - fogged * 0.35);
+	float hud_on = glass * on * flicker * dropout * (1.0 - fogged * 0.35);
+	vec3 sickly = vec3(dot(hud.rgb, vec3(0.3, 0.6, 0.1))) * vec3(1.15, 1.0, 0.35);
+	hud.rgb = mix(hud.rgb, sickly, clamp(m * 1.5, 0.0, 1.0));
 	col = mix(col, hud.rgb, hud.a * hud_on) + glow.rgb * glow.a * 0.35 * hud_on;
 
-	// Cracks: bright hairlines with a dark halo.
-	col *= (1.0 + crack.z) * (1.0 - crack.y * 0.35);
-	col = mix(col, vec3(0.82, 0.86, 0.86), crack.x * 0.7);
+	// Cracks: bright hairlines with a dark halo. The worse the mind, the more they're blood instead:
+	// the hairlines run dark red and each impact becomes a splatter.
+	col *= (1.0 + crack.z * (1.0 - bloody)) * (1.0 - crack.y * 0.35);
+	col = mix(col, mix(vec3(0.82, 0.86, 0.86), vec3(0.28, 0.01, 0.01), bloody), crack.x * 0.7);
+	vec3 blood = vec3(0.2, 0.0, 0.005) + vec3(0.12, 0.02, 0.02) * value_noise(p * 90.0);
+	col = mix(col, blood, splat * bloody * 0.88);
 
 	// A hit flashes around the rim.
 	col = mix(col, vec3(0.9, 0.93, 0.9), hit_flash * on * near_rim * 0.35);

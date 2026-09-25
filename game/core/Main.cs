@@ -1,3 +1,4 @@
+using System.Linq;
 using Godot;
 using RND.UI;
 
@@ -9,7 +10,8 @@ namespace RND.Core;
 /// </summary>
 public partial class Main : Node
 {
-	[Export] public PackedScene StartLevel { get; set; }
+	/// <summary>What the host can pick in the menu. The first is the default. Each must also be in LevelSpawner.</summary>
+	[Export] public Godot.Collections.Array<PackedScene> Levels { get; set; } = new();
 
 	private Node _levelRoot;
 	private MainMenu _menu;
@@ -20,6 +22,7 @@ public partial class Main : Node
 		_levelRoot = GetNode("Level");
 		_menu = GetNode<MainMenu>("UI/MainMenu");
 		_hud = GetNode<Hud>("UI/Hud");
+		_menu.SetLevels(Levels.Select(level => level.ResourcePath.GetFile().GetBaseName().Capitalize()));
 
 		Network.Instance.SessionStarted += OnSessionStarted;
 		Network.Instance.SessionEnded += OnSessionEnded;
@@ -31,7 +34,7 @@ public partial class Main : Node
 		_hud.Open();
 
 		if (Multiplayer.IsServer())
-			Callable.From(() => ChangeLevel(StartLevel)).CallDeferred();
+			Callable.From(() => ChangeLevel(Levels[_menu.SelectedLevel])).CallDeferred();
 	}
 
 	private void OnSessionEnded(string reason)

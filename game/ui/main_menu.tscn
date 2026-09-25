@@ -55,6 +55,11 @@ layout_mode = 2
 text = "127.0.0.1"
 placeholder_text = "Host address (ip or ip:port)"
 
+[node name="Level" type="OptionButton" parent="Center/Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Level to load when you host"
+
 [node name="Buttons" type="HBoxContainer" parent="Center/Panel"]
 layout_mode = 2
 theme_override_constants/separation = 10

@@ -1,0 +1,153 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://levels/Level.cs" id="1_level"]
+[ext_resource type="PackedScene" path="res://players/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://enemies/enemy.tscn" id="3_enemy"]
+[ext_resource type="Script" path="res://vfx/Effects.cs" id="4_effects"]
+[ext_resource type="Script" path="res://audio/Ambience.cs" id="5_ambience"]
+[ext_resource type="Script" path="res://maze/ChamberExit.cs" id="6_exit"]
+
+[sub_resource type="Environment" id="Environment_chamber"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.025, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.85, 0.9, 1, 1)
+ambient_light_energy = 0.35
+tonemap_mode = 2
+ssao_enabled = true
+glow_enabled = true
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_chamber"]
+geometry_parsed_geometry_type = 1
+geometry_collision_mask = 1
+cell_height = 0.05
+agent_height = 2.25
+agent_radius = 0.5
+agent_max_climb = 0.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_panel"]
+albedo_color = Color(0.78, 0.8, 0.82, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_exit"]
+albedo_color = Color(0.2, 0.6, 1, 1)
+emission_enabled = true
+emission = Color(0.2, 0.6, 1, 1)
+emission_energy_multiplier = 0.6
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_exit"]
+size = Vector3(3, 3, 3)
+
+[node name="Chamber" type="Node3D"]
+script = ExtResource("1_level")
+PlayerScene = ExtResource("2_player")
+EnemyScene = ExtResource("3_enemy")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_chamber")
+
+[node name="Navigation" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_chamber")
+
+[node name="Geometry" type="Node3D" parent="Navigation"]
+
+[node name="Shell" type="CSGCombiner3D" parent="Navigation/Geometry"]
+use_collision = true
+
+[node name="Solid" type="CSGBox3D" parent="Navigation/Geometry/Shell"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+size = Vector3(14, 6, 22)
+material = SubResource("StandardMaterial3D_panel")
+
+[node name="Room" type="CSGBox3D" parent="Navigation/Geometry/Shell"]
+operation = 2
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+size = Vector3(12, 4, 12)
+material = SubResource("StandardMaterial3D_panel")
+
+[node name="StartCorridor" type="CSGBox3D" parent="Navigation/Geometry/Shell"]
+operation = 2
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 7.95)
+size = Vector3(3, 3, 4.1)
+material = SubResource("StandardMaterial3D_panel")
+
+[node name="ExitCorridor" type="CSGBox3D" parent="Navigation/Geometry/Shell"]
+operation = 2
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -7.95)
+size = Vector3(3, 3, 4.1)
+material = SubResource("StandardMaterial3D_panel")
+
+[node name="ExitMarker" type="CSGBox3D" parent="Navigation/Geometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.01, -8.5)
+size = Vector3(2.6, 0.02, 2.6)
+material = SubResource("StandardMaterial3D_exit")
+
+[node name="Lights" type="Node3D" parent="."]
+
+[node name="RoomLight" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.6, 0)
+light_energy = 1.6
+shadow_enabled = true
+omni_range = 12.0
+
+[node name="StartLight" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, 8.5)
+light_energy = 0.8
+omni_range = 5.0
+
+[node name="ExitLight" type="OmniLight3D" parent="Lights"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, -8.5)
+light_color = Color(0.6, 0.8, 1, 1)
+light_energy = 0.8
+omni_range = 5.0
+
+[node name="Exit" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, -8.5)
+script = ExtResource("6_exit")
+
+[node name="Shape" type="CollisionShape3D" parent="Exit"]
+shape = SubResource("BoxShape3D_exit")
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://players/player.tscn")
+spawn_path = NodePath("../Players")
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://enemies/enemy.tscn")
+spawn_path = NodePath("../Enemies")
+
+[node name="Projectiles" type="Node3D" parent="."]
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://items/acid_flask_projectile.tscn")
+spawn_path = NodePath("../Projectiles")
+
+[node name="Effects" type="Node3D" parent="."]
+script = ExtResource("4_effects")
+
+[node name="Ambience" type="Node3D" parent="."]
+script = ExtResource("5_ambience")
+
+[node name="SpawnPoints" type="Node3D" parent="."]
+
+[node name="Spawn1" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 8.5)
+
+[node name="Spawn2" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.05, 8.5)
+
+[node name="Spawn3" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.05, 8.5)
+
+[node name="Spawn4" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.05, 9.5)
+
+[node name="Spawn5" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 9.5)
+
+[node name="Spawn6" type="Marker3D" parent="SpawnPoints" groups=["player_spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.05, 9.5)

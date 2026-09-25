@@ -13,6 +13,7 @@ public struct MaskState
 	public float Choke;         // 0 .. 1, spent filter
 	public float FilterWear;    // 0 fresh .. 1 spent
 	public float Danger;        // 0 healthy .. 1 nearly dead (drives the heartbeat)
+	public float Mind;          // 0 .. 1, mental damage (drives a tinnitus ring)
 }
 
 /// <summary>
@@ -23,7 +24,7 @@ public struct MaskState
 public sealed class MaskSynth
 {
 	// Your own breathing should sit under the world, not on top of it.
-	private const float BreathGain = 0.28f;
+	private const float BreathGain = 0.07f; // barely there: you notice it when the room goes quiet and you listen
 
 	private readonly Random _random = new(1);
 	private readonly float[] _cavity = new float[70]; // ~3 ms: the boxy ring of air trapped in a mask
@@ -39,13 +40,15 @@ public sealed class MaskSynth
 	private float _heartPhase;
 	private float _hissTime = -1f;
 	private float _time;
+	private float _catch = 1f;   // starved breathing: the current catch in the throat (0.2 choked off .. 1 flowing)
+	private int _catchLeft;
 
 	public void PlayFreshFilter() => _hissTime = 0f;
 
 	public void Render(Vector2[] output, in MaskState state)
 	{
 		float bpm = Mathf.Lerp(72f, 150f, state.Danger) + state.Exertion * 20f;
-		float loudness = Mathf.Lerp(0.5f, 1.3f, state.Exertion) + state.Choke * 0.6f;
+		float loudness = Mathf.Lerp(0.5f, 1.3f, state.Exertion) + state.Choke * 2f; // fewer breaths out of gas, but you hear every strained one
 		float wheeze = Mathf.Max(state.FilterWear * state.FilterWear, state.Choke);
 
 		for (int i = 0; i < output.Length; i++)
@@ -67,11 +70,21 @@ public sealed class MaskSynth
 
 				// Out through the exhale valve: a warm, low "hoo". In through the filter: a breathier draw,
 				// with a whistle that grows as the filter clogs.
-				float breath = (_exhaleLow.Process(_soft, 380f, 0.9f) + _exhaleMid.Process(_soft, 950f, 1.6f) * 0.5f) * exhale
-					+ (_inhaleMid.Process(_soft, 1150f, 1.2f) * 0.6f
+				// Out of gas (Choke): like an empty scuba tank. Each pull is strained against a valve that gives
+				// nothing (the thin whistle takes over), each exhale is short and weak, and the air comes in
+				// catches and stutters instead of a steady flow.
+				float breath = (_exhaleLow.Process(_soft, 380f, 0.9f) + _exhaleMid.Process(_soft, 950f, 1.6f) * 0.5f) * exhale * (1f - 0.7f * state.Choke)
+					+ (_inhaleMid.Process(_soft, 1150f, 1.2f) * 0.6f * (1f - 0.5f * state.Choke)
 						+ _inhaleWhistle.Process(noise, Mathf.Lerp(2000f, 2600f, wheeze), Mathf.Lerp(2f, 9f, wheeze)) * (0.1f + 0.5f * wheeze)) * inhale;
 				if (state.Choke > 0f)
-					breath *= 1f - state.Choke * 0.5f * (0.5f + 0.5f * Mathf.Sin(_time * Mathf.Tau * 23f)); // ragged
+				{
+					if (--_catchLeft <= 0)
+					{
+						_catch = 0.2f + 0.8f * (float)_random.NextDouble();
+						_catchLeft = 1200 + _random.Next(3600); // 25-100 ms per catch
+					}
+					breath *= Mathf.Lerp(1f, _catch, state.Choke);
+				}
 				breath = breath * loudness + Valve();
 
 				// Resonate in the small space between your face and the glass.
@@ -82,6 +95,10 @@ public sealed class MaskSynth
 
 				if (state.Danger > 0f)
 					sample += Heartbeat(bpm) * state.Danger * 0.6f;
+
+				// Mental damage rings in your ears: a thin high tone that slowly swells and fades.
+				if (state.Mind > 0f)
+					sample += Mathf.Sin(_time * Mathf.Tau * 6800f) * (0.75f + 0.25f * Mathf.Sin(_time * 0.9f)) * state.Mind * 0.03f;
 			}
 
 			sample = MathF.Tanh(sample); // soft limiter: overlapping sounds squash instead of clipping

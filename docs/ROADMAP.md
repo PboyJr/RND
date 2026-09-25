@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (real flask and graduated cylinder models; backlog: game modes, psychosis / rat lore, maze as Portal-style test chambers)
+Last updated: 2026-09-25 (M7 maze mode started: level picker and the first test chamber with a start and an end)
 
 ---
 
@@ -96,6 +96,19 @@ Goal: sound sells the mask as much as the visor does.
 - [x] Cel shading keeps the room as dark as without it (it was 89% brighter). The capture test
       measures this
 
+### M7: Maze mode (in progress)
+
+- [x] Level picker in the main menu (the host chooses which level to load)
+- [x] First grey-box test chamber (`maze/test_chamber.tscn`): a start corridor where you spawn,
+      a room, and an exit corridor. The test passes when every living player stands in the exit
+- [x] Visor readout: test clock, then "test complete" (no rat comparison: lore stays clues only)
+- [x] Mental damage: one health pool, physical cracks the glass, mental corrupts the HUD (text
+      scramble, tearing, dropouts, sickly green), narrows vision and rings in your ears. Low gas
+      (below 15%) deals it as withdrawal, replacing physical choke damage. Purple debug bar
+- [ ] Puzzle pieces: pressure plate + door, timed button
+- [ ] Chain chambers into a maze (REPO-style stitched rooms), difficulty ramp
+- [ ] The evil guy as a maze "variable"
+
 ---
 
 ## Next: pick one
@@ -129,7 +142,7 @@ Rough order, and likely to change:
 - **More game modes** (idea): maze solving, payload delivery, and a Research mode, alongside
   REPO-style retrieval (see DESIGN → Game modes). A maze would be the first thing to prototype,
   since psychosis builds up in it. Maze = Portal-style test chambers. A first prototype could be
-  one grey-box chamber: a pressure plate + door, a timed button, an exit trigger and a rat par time.
+  one grey-box chamber: a pressure plate + door, a timed button, and an exit trigger.
 - **Psychosis + rat lore** (idea): the longer you stay in the maze, the more likely you and your
   friends start to look like rats, which is the truth. Needs rat models (see ART.md) and a
   per-player status effect (see DESIGN → Lore).

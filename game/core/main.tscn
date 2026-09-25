@@ -1,56 +1,79 @@
-[gd_scene format=3]
+[gd_scene format=4 uid="uid://b5s3pcfgr2g1p"]
 
-[ext_resource type="Script" path="res://core/Main.cs" id="1_main"]
+[ext_resource type="Script" uid="uid://cc0y1luvix0cq" path="res://core/Main.cs" id="1_main"]
 [ext_resource type="PackedScene" path="res://levels/test_level.tscn" id="2_level"]
-[ext_resource type="Shader" path="res://vfx/visor.gdshader" id="3_visor_shader"]
-[ext_resource type="Script" path="res://vfx/Visor.cs" id="4_visor"]
+[ext_resource type="Shader" uid="uid://cx6ivgoneixyh" path="res://vfx/visor.gdshader" id="3_visor_shader"]
+[ext_resource type="Script" uid="uid://dmnv6nsgcmn62" path="res://vfx/Visor.cs" id="4_visor"]
 [ext_resource type="PackedScene" path="res://ui/visor_hud.tscn" id="5_visor_hud"]
 [ext_resource type="PackedScene" path="res://ui/hud.tscn" id="6_hud"]
 [ext_resource type="PackedScene" path="res://ui/main_menu.tscn" id="7_menu"]
-[ext_resource type="Script" path="res://audio/MaskAudio.cs" id="8_mask_audio"]
-[ext_resource type="Script" path="res://vfx/ToonStyle.cs" id="9_toon_style"]
-[ext_resource type="Shader" path="res://vfx/toon.gdshader" id="10_toon_shader"]
-[ext_resource type="Shader" path="res://vfx/outline.gdshader" id="11_outline_shader"]
-[ext_resource type="Texture2D" path="res://vfx/toon_ramp.tres" id="12_toon_ramp"]
+[ext_resource type="Script" uid="uid://co88sqsu7wipm" path="res://audio/MaskAudio.cs" id="8_mask_audio"]
+[ext_resource type="Script" uid="uid://ks5emtljdacd" path="res://vfx/ToonStyle.cs" id="9_toon_style"]
+[ext_resource type="Shader" uid="uid://c2g5bxbthifur" path="res://vfx/toon.gdshader" id="10_toon_shader"]
+[ext_resource type="Shader" uid="uid://cmugx6gpn6oq4" path="res://vfx/outline.gdshader" id="11_outline_shader"]
+[ext_resource type="Texture2D" uid="uid://dxgmebh60xgii" path="res://vfx/toon_ramp.tres" id="12_toon_ramp"]
+[ext_resource type="PackedScene" path="res://maze/test_chamber.tscn" id="13_chamber"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
+render_priority = 0
 shader = ExtResource("11_outline_shader")
+shader_parameter/line_color = Color(0, 0, 0, 1)
+shader_parameter/line_opacity = 0.55
+shader_parameter/thickness = 1.0
+shader_parameter/depth_threshold = 0.12
+shader_parameter/normal_threshold = 0.6
+shader_parameter/fade_distance = 30.0
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_visor"]
 shader = ExtResource("3_visor_shader")
+shader_parameter/visor_enabled = 0.0
+shader_parameter/damage = 0.0
+shader_parameter/impacts = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/impact_count = 0
+shader_parameter/fog = 0.0
+shader_parameter/choke = 0.0
+shader_parameter/hit_flash = 0.0
+shader_parameter/sway = Vector2(0, 0)
+shader_parameter/glass_curve = 0.06
+shader_parameter/rim_color = Color(0.02, 0.022, 0.025, 1)
+shader_parameter/lens_on = true
+shader_parameter/grain_strength = 0.07
+shader_parameter/grain_fps = 24.0
+shader_parameter/color_levels = 48.0
+shader_parameter/grain_on = true
+shader_parameter/crush_on = true
 
-[node name="Main" type="Node"]
+[node name="Main" type="Node" unique_id=182588471]
 script = ExtResource("1_main")
-StartLevel = ExtResource("2_level")
+Levels = Array[PackedScene]([ExtResource("2_level"), ExtResource("13_chamber")])
 
-[node name="Level" type="Node" parent="."]
+[node name="Level" type="Node" parent="." unique_id=119505994]
 
-[node name="LevelSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://levels/test_level.tscn")
+[node name="LevelSpawner" type="MultiplayerSpawner" parent="." unique_id=786764438]
+_spawnable_scenes = PackedStringArray("res://levels/test_level.tscn", "res://maze/test_chamber.tscn")
 spawn_path = NodePath("../Level")
 spawn_limit = 1
 
-[node name="MaskAudio" type="Node" parent="."]
+[node name="MaskAudio" type="Node" parent="." unique_id=2052791583]
 script = ExtResource("8_mask_audio")
 
-[node name="ToonStyle" type="Node" parent="."]
+[node name="ToonStyle" type="Node" parent="." unique_id=28519146]
 script = ExtResource("9_toon_style")
 ToonShader = ExtResource("10_toon_shader")
 OutlineMaterial = SubResource("ShaderMaterial_outline")
 Ramp = ExtResource("12_toon_ramp")
 
-[node name="HudViewport" type="SubViewport" parent="."]
+[node name="HudViewport" type="SubViewport" parent="." unique_id=1326386095]
 disable_3d = true
 transparent_bg = true
 render_target_update_mode = 4
 
-[node name="VisorHud" parent="HudViewport" instance=ExtResource("5_visor_hud")]
+[node name="VisorHud" parent="HudViewport" unique_id=241859070 instance=ExtResource("5_visor_hud")]
 
-[node name="PostFX" type="CanvasLayer" parent="."]
+[node name="PostFX" type="CanvasLayer" parent="." unique_id=715036033]
 
-[node name="Visor" type="ColorRect" parent="PostFX" node_paths=PackedStringArray("HudViewport")]
+[node name="Visor" type="ColorRect" parent="PostFX" unique_id=370770535 node_paths=PackedStringArray("HudViewport")]
 material = SubResource("ShaderMaterial_visor")
-layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -60,12 +83,12 @@ mouse_filter = 2
 script = ExtResource("4_visor")
 HudViewport = NodePath("../../HudViewport")
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=508222418]
 layer = 2
 
-[node name="Hud" parent="UI" node_paths=PackedStringArray("Toon", "Visor") instance=ExtResource("6_hud")]
+[node name="Hud" parent="UI" unique_id=1023148841 node_paths=PackedStringArray("Toon", "Visor") instance=ExtResource("6_hud")]
 visible = false
 Toon = NodePath("../../ToonStyle")
 Visor = NodePath("../../PostFX/Visor")
 
-[node name="MainMenu" parent="UI" instance=ExtResource("7_menu")]
+[node name="MainMenu" parent="UI" unique_id=614901885 instance=ExtResource("7_menu")]

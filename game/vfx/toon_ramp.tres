@@ -1,4 +1,4 @@
-[gd_resource type="GradientTexture1D" format=3]
+[gd_resource type="GradientTexture1D" format=3 uid="uid://dxgmebh60xgii"]
 
 [sub_resource type="Gradient" id="Gradient_toon"]
 interpolation_mode = 1
@@ -7,4 +7,3 @@ colors = PackedColorArray(0.01, 0.01, 0.01, 1, 0.07, 0.07, 0.07, 1, 0.3, 0.3, 0.
 
 [resource]
 gradient = SubResource("Gradient_toon")
-width = 256

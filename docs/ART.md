@@ -51,7 +51,7 @@ matters from the model: clean normals, and flat colour areas without painted-in 
 
 The outlines are thin (1 px) by default. To change their width, colour or how many edges get
 lines: select `Main/ToonStyle` in `core/main.tscn` → **Outline Material** → Shader Parameters
-(`Thickness`, `Line Color`, `Depth Threshold`, `Normal Threshold`, `Fade Distance`).
+(`Thickness`, `Line Color`, `Line Opacity` (below 1 the line only darkens the surface under it, so it picks up the wall's colour and light; default black at 0.55), `Depth Threshold`, `Normal Threshold`, `Fade Distance`).
 
 ## The models folder
 
@@ -100,6 +100,57 @@ update:
 
 Everything else (carrying, throwing, networking, the liquid staying level, sloshing and
 refilling) already works.
+
+## Rigging and animation
+
+Nothing in the game is rigged or animated yet. This is the plan for when it is.
+
+**Characters and creatures (Blender):**
+
+1. Rig in Blender: an armature, with the mesh weight-painted to it. Rigify or Mixamo (free
+   auto-rig and animations for humanoids) are fine for a first pass.
+2. Make each animation its own **Action**, named from the list below. Names are the contract with
+   code: code plays `Walk` by name, so a better `Walk` can be re-exported any time without code
+   changes.
+3. Export as `.glb` (skeleton, skin and all actions in one file) into `game/models/`.
+4. In Godot, double-click the `.glb` and turn on **looping** for the looping animations (Idle,
+   Walk, Run...).
+
+Starting name list (add to it as needed): `Idle`, `Walk`, `Run`, `Crouch`, `Grab`, `Throw`,
+`Hurt`, `Death`. Enemies will want their own (`Alert`, `Search`, `Attack`...), agreed per enemy.
+
+**Simple object animation (Godot, no code):** doors, flickering lights, fans, machines. Add an
+**AnimationPlayer** to the scene and keyframe any property in the editor (position, rotation, light
+energy, colour). Name the animations clearly (`Open`, `Close`, `Flicker`). Code only decides
+*when* they play.
+
+**Code's side:** blending between animations (an `AnimationTree` driven by speed or AI state),
+first-person hands synced to items, and anything networked.
+
+## Level design (Godot editor, no code)
+
+Levels are scenes (`levels/test_level.tscn`, `maze/test_chamber.tscn`). Everything below happens
+in the editor.
+
+- **Blockout:** CSG shapes (`CSGBox3D` etc.): drag-and-resize boxes with collision built in. Greybox
+  a room fast, then swap in Blender models later.
+- **Props:** drag prop scenes from `props/` into the level. Carrying, throwing and networking
+  already work.
+- **Lighting and mood:** `OmniLight3D` / `SpotLight3D`, plus the `WorldEnvironment` (fog, ambient
+  light).
+- **Spawn points:** `Marker3D` nodes.
+- **Modular kits (later):** wall, floor and door pieces modelled on a grid can be painted into
+  levels like tiles with a **GridMap**.
+
+Gotchas:
+
+- **Rebake the navmesh after any layout change:** select `NavigationRegion3D` → **Bake
+  NavigationMesh**. Enemies pathfind on it, so without a rebake they walk through new walls or get
+  stuck.
+- Blender models placed in a level need **collision**. Code builds it for now, or the `.glb` import
+  dialog can generate simple shapes.
+- Don't edit the same `.tscn` as someone else at the same time. Scene-file merge conflicts are
+  painful.
 
 ## Coming up if the rat lore sticks (idea)
 

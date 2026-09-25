@@ -459,6 +459,33 @@ so note that in the script's header.
 **Note:** the flask's `Liquid` now fills the neck too, so the same `Fill` sits higher than on the
 placeholder. The model scene sets `Fill = 0.45` to keep about the same level.
 
+## 2026-09-25: The host picks a level in the menu; maze chambers are ordinary levels
+
+**Decision:** `Main.Levels` lists the levels the host can load (the first is the default), and the
+main menu's level picker chooses one before hosting. Each must also be in `LevelSpawner`. The first
+maze chamber, `maze/test_chamber.tscn`, uses the same `Level` script as the test level. Its end is a
+`ChamberExit` area (`maze/ChamberExit.cs`): the host passes the test once every living player is
+inside at the same time, and tells everyone the time with a reliable RPC. The visor shows the clock at the top.
+
+**Why:** the smallest way to try a second mode without a lobby or mode-select screen. Chambers
+being plain levels means stitching them together later is about placing rooms, not new plumbing.
+
+## 2026-09-25: Mental damage is part of Health, not a separate meter
+
+**Decision:** `Health` keeps one pool, plus `Mental`: how much of the lost health was mental.
+`TakeMentalDamage` (host only) takes it off `Current` and adds it to `Mental`; `Physical`
+(`Current + Mental`) is health counting only physical hits. `Damaged` only fires for physical
+damage, so mental damage doesn't flash your body or make an enemy retarget. Revive clears both.
+The player's health synchronizer lists `Mental` **before** `Current`, so a client already has the
+new `Mental` when `Current` drops and can tell the drop was mental. The visor's cracks and the
+mask muffle follow `Physical`; the visor shader's `mind` uniform (Mental / MaxHealth) corrupts the
+projected HUD, `VisorHud` scrambles its text, and `MaskSynth` adds a tinnitus tone. Withdrawal
+(`Respirator`, below `LowGasFraction`) replaces the old physical choke damage.
+
+**Why:** the user wanted one health that dies either way, with mental damage looking different
+(see DESIGN → "The mask is the lie"). A second pool would need its own death rules and a second
+readout.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -511,3 +538,12 @@ Things the prototype does on purpose that we'll need to revisit:
 - Rebuilding the C# code or reimporting assets from the command line while the Godot editor is
   open can leave the editor running stale state (seen 2026-09-25: the evil guy saw you but never
   left his spawn). Close Godot fully and reopen the project.
+- Maze chamber clocks start when each peer loads the chamber, and "test complete" is a one-off RPC,
+  so a late joiner's clock is off and they never see the test as passed. Sync the chamber state
+  once chambers chain into a maze.
+- Passing a chamber doesn't lead anywhere yet: there's one chamber and no next one.
+- Telling mental from physical drops on clients relies on the health synchronizer sending `Mental`
+  and `Current` in the same update, `Mental` first. If a drop ever mixes both in one update, only
+  the physical part counts as a hit, which is right; if they ever arrive in separate updates, a
+  mental tick could briefly look like a small physical hit (a tiny crack).
+- Mental damage never heals except by respawning, like physical.
