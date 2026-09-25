@@ -77,13 +77,13 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | Hold LMB with Hands | Grab and carry (let go to drop; props keep momentum, so you can fling them) |
 | RMB while carrying | Throw the prop |
 | Scroll while carrying | Push / pull |
-| LMB with the acid flask | Throw it (15 s recharge; the flask in your hand refills) |
+| LMB with the acid flask | Throw it (5 s recharge; the flask in your hand refills) |
 | E on (or holding) a spare filter | Screw it onto your mask |
 | F2 – F6 | Debug view switches, to compare looks: cel shading, outlines, film grain, colour crush, lens (glass curve, edge blur, fringe). Pressing one lists what's on, top right |
 | Esc | Free the mouse, leave session |
 
-You see everything through a gas mask. **The cracks in the glass are your health**; there's no
-health number, except a plain debug bar in the corner. Your **filter** runs down (faster when you
+You see everything through a gas mask. **The cracks in the glass are your health** (each hit
+cracks the side it came from); there's no health number, except a plain debug bar in the corner. Your **filter** runs down (faster when you
 sprint), and when it's spent you choke. Find spare filter canisters and screw them on. Play with
 sound on: you hear your own breathing (it wheezes as the filter wears), a heartbeat when you're
 badly hurt, and the world muffled through the mask, less so the more it's cracked.

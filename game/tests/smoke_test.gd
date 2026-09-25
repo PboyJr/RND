@@ -88,7 +88,7 @@ func _run_scenes() -> void:
 # Acid flask vs. evil guy, evil guy vs. player, death and respawn, all offline as the host.
 func _run_offline_combat(level: Node, player: Node3D) -> void:
 	var flask = load("res://items/acid_flask.tres")
-	_check(flask != null and flask.Cooldown == 15.0, "acid_flask.tres didn't load as a 15 s throwable")
+	_check(flask != null and flask.Cooldown == 5.0, "acid_flask.tres didn't load as a 5 s throwable")
 	if not _check(player.Loadout.size() == 1, "player loadout should hold the acid flask (size %d)" % player.Loadout.size()):
 		return
 
@@ -118,7 +118,7 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 
 	player.rpc_id(1, "RequestThrowItem", 1, eye, aim) # still recharging, so the host must refuse
 	await _seconds(1.0)
-	_check(enemy_health.Current == after_hit, "offline: flask ignored its 15 s recharge")
+	_check(enemy_health.Current == after_hit, "offline: flask ignored its recharge")
 
 	# The flask in hand empties when thrown, then its acid refills over the recharge.
 	var hand_liquid := player.get_node("Head/Camera3D/HandItem").find_child("Liquid", true, false)
@@ -129,7 +129,8 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 	await _frames(2)
 	_check(full_fill > 0.5 and hand_liquid.Fill < 0.02, "offline: thrown flask didn't empty in hand (%.2f -> %.2f)" % [full_fill, hand_liquid.Fill])
 	await _seconds(1.5)
-	_check(hand_liquid.Fill > 0.03 and hand_liquid.Fill < 0.15, "offline: flask in hand isn't refilling with the recharge (%.2f)" % hand_liquid.Fill)
+	var expected: float = full_fill * 1.5 / flask.Cooldown
+	_check(absf(hand_liquid.Fill - expected) < 0.06, "offline: flask in hand isn't refilling with the recharge (%.2f, expected %.2f)" % [hand_liquid.Fill, expected])
 	player.SelectedSlot = 0
 
 	# Let it loose next to us: it should swing and hurt us.
@@ -491,7 +492,7 @@ func _run_capture() -> void:
 	await _seconds(0.5)
 	await _screenshot(out.path_join("hand_full.png"))
 	player.UseSelectedItem()
-	await _seconds(5.0)
+	await _seconds(player.Loadout[0].Cooldown / 3.0)
 	await _screenshot(out.path_join("hand_refilling.png"))
 	player.SelectedSlot = 0
 
@@ -502,13 +503,20 @@ func _run_capture() -> void:
 	_level().EmitSound(player.global_position + Vector3(2, 1, -3), 14.0, SHATTER)
 	_level().EmitSound(enemy.global_position + Vector3.UP * 2.0, 12.0, GROWL)
 	await _meter("shatter + growl nearby", 1.5)
+	# Hits crack the glass toward whatever hit you: first from the front left, then from behind on the right.
+	enemy.global_position = player.global_position + Vector3(-1.6, 0, -1.8)
+	await _frames(2)
 	health.TakeDamage(45.0, 0) # cracks: the mask muffles less from here
 	await _meter("hurt (cracked mask)", 0.6)
 	await _screenshot(out.path_join("visor_2_hurt.png"))
+	enemy.global_position = player.global_position + Vector3(1.5, 0, 1.2)
+	await _frames(2)
 	health.TakeDamage(35.0, 0)
 	player.get_node("Respirator").Remaining = 0.0
 	await _meter("choking + heartbeat", 1.2)
 	await _screenshot(out.path_join("visor_3_choking.png"))
+	var fractures: int = visor.ImpactCount
+	_check(fractures == 2, "capture: expected one fracture per hit, and choking to spread them, not add more (%d)" % fractures)
 	_network.Leave()
 
 

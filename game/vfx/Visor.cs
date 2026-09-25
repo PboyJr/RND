@@ -1,16 +1,34 @@
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
+using RND.Levels;
 using RND.Players;
 
 namespace RND.Vfx;
 
 /// <summary>
-/// Drives the full-screen visor shader (vfx/visor.gdshader) from the local player: cracks from health,
-/// breath fog from the player's Breathing (the same rhythm you hear) and filter wear, choking from a
-/// spent filter, sway from looking around, flashes from hits. Also keeps the projected-HUD viewport
-/// the same size as the screen.
+/// Drives the full-screen visor shader (vfx/visor.gdshader) from the local player: cracks from hits
+/// (the health bar), breath fog from the player's Breathing (the same rhythm you hear) and filter
+/// wear, choking from a spent filter, sway from looking around, flashes from hits. Also keeps the
+/// projected-HUD viewport the same size as the screen.
 /// </summary>
 public partial class Visor : ColorRect
 {
+	private const int MaxImpacts = 12; // the size of `impacts` in visor.gdshader
+	// Hits smaller than this (choking, grazes) spread the latest crack instead of starting a new one.
+	private const float MinNewImpact = 0.06f;
+	private const float AttackerReach = 4f;
+
+	// One fracture per hit: where it struck the glass (visor space), its pattern, how big the hit was
+	// (fraction of max health), and how far it has spread so far.
+	private sealed class Impact
+	{
+		public Vector2 At;
+		public float Seed;
+		public float Size;
+		public float Spread;
+	}
+
 	[Export] public SubViewport HudViewport { get; set; }
 
 	// Look switches: the Hud's debug hotkeys flip these (F4–F6), and these checkboxes are the defaults.
@@ -33,6 +51,10 @@ public partial class Visor : ColorRect
 	private float _lastYaw;
 	private float _lastPitch;
 	private Vector2 _sway;
+	private readonly List<Impact> _impacts = new();
+	private readonly float[] _impactData = new float[MaxImpacts * 4];
+
+	public int ImpactCount => _impacts.Count;
 
 	public override void _Ready()
 	{
@@ -56,8 +78,8 @@ public partial class Visor : ColorRect
 		if (player == null)
 			return;
 
-		// The glass is the health bar. New damage spreads the cracks quickly; a fresh mask (respawn) is
-		// instantly clean.
+		// The glass is the health bar: every hit fractures it, and the weaker the mask, the further
+		// all the cracks run. A fresh mask (respawn) is instantly clean.
 		float health = player.Health.Current;
 		float targetDamage = 1f - health / player.Health.MaxHealth;
 		_damage = targetDamage < _damage ? targetDamage : Mathf.MoveToward(_damage, targetDamage, dt * 3f);
@@ -65,8 +87,14 @@ public partial class Visor : ColorRect
 		{
 			_hitFlash = 1f;
 			_sway += Vector2.FromAngle((float)GD.RandRange(0.0, Mathf.Tau)) * 0.04f; // the mask jolts
+			Crack(player, (_lastHealth - health) / player.Health.MaxHealth);
+		}
+		else if (health >= player.Health.MaxHealth)
+		{
+			_impacts.Clear(); // ponytail: only a full mask clears; partial healing would need to mend cracks
 		}
 		_lastHealth = health;
+		UploadImpacts(dt);
 		_hitFlash = Mathf.MoveToward(_hitFlash, 0f, dt * 3f);
 
 		// Breath fog puffs on each exhale, harder when exerted; a tired filter leaves the mask clammier.
@@ -102,6 +130,55 @@ public partial class Visor : ColorRect
 		_lastYaw = player.Rotation.Y;
 		_lastPitch = player.SyncPitch;
 		_sway = Vector2.Zero;
+		_impacts.Clear();
+		if (_damage > 0f)
+			Crack(player, _damage); // already hurt (e.g. joined mid-fight)
+	}
+
+	private void Crack(Player player, float size)
+	{
+		if (_impacts.Count > 0 && (size < MinNewImpact || _impacts.Count == MaxImpacts))
+			_impacts[^1].Size += size;
+		else
+			_impacts.Add(new Impact { At = ImpactPoint(player), Seed = GD.Randf() * 100f, Size = size });
+	}
+
+	// Where a hit lands on the glass: toward whatever hit us (the nearest evil guy within reach, as seen
+	// through the visor; from behind or the side, the rim on that side), with some scatter. Nothing
+	// nearby (choking, a fall): anywhere on the glass.
+	private Vector2 ImpactPoint(Player player)
+	{
+		var glass = new Vector2(1.35f, 0.75f); // roughly the visor's inner half-size
+		Camera3D camera = GetViewport().GetCamera3D();
+		Node3D attacker = Level.Current?.Enemies
+			.Where(enemy => enemy.GlobalPosition.DistanceTo(player.GlobalPosition) < AttackerReach)
+			.MinBy(enemy => enemy.GlobalPosition.DistanceTo(player.GlobalPosition));
+		if (attacker == null || camera == null)
+			return new Vector2(GD.Randf() * 2f - 1f, GD.Randf() * 2f - 1f) * glass * 0.8f;
+
+		// Camera space (-Z forward) to visor space: the same perspective the screen uses.
+		Vector3 local = camera.GlobalTransform.AffineInverse() * (attacker.GlobalPosition + Vector3.Up * 1.2f);
+		float spread = Mathf.Tan(Mathf.DegToRad(camera.Fov) * 0.5f) * Mathf.Max(-local.Z, 0.3f);
+		Vector2 onGlass = new Vector2(local.X, local.Y) / spread;
+		Vector2 scatter = new Vector2(GD.Randf() - 0.5f, GD.Randf() - 0.5f) * 0.4f;
+		return (onGlass / glass).LimitLength(1f) * glass + scatter;
+	}
+
+	// Cracks race out to their full size in a moment, then the shader draws them.
+	private void UploadImpacts(float dt)
+	{
+		for (int i = 0; i < MaxImpacts; i++)
+		{
+			Impact impact = i < _impacts.Count ? _impacts[i] : null;
+			if (impact != null)
+				impact.Spread = Mathf.MoveToward(impact.Spread, Mathf.Min(impact.Size, 1f), dt * 2f);
+			_impactData[i * 4] = impact?.At.X ?? 0f;
+			_impactData[i * 4 + 1] = impact?.At.Y ?? 0f;
+			_impactData[i * 4 + 2] = impact?.Seed ?? 0f;
+			_impactData[i * 4 + 3] = impact?.Spread ?? 0f;
+		}
+		_material.SetShaderParameter("impacts", _impactData);
+		_material.SetShaderParameter("impact_count", _impacts.Count);
 	}
 
 	private void FitHudToScreen() => HudViewport.Size = (Vector2I)GetViewport().GetVisibleRect().Size;

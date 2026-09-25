@@ -85,10 +85,12 @@ Goal: sound sells the mask as much as the visor does.
 - [x] Placeholder Erlenmeyer flask prop, ready for the real model (steps in ART.md)
 - [x] Capture shots: toon off / on, liquid still / mid-slosh; smoke check that liquid sloshes and settles
 - [x] Acid beaker → **acid flask**: the Erlenmeyer flask in your hand (and thrown), its acid
-      refilling over the 15 s recharge, visible to everyone; one shared flask model scene
+      refilling over its recharge (now 5 s), visible to everyone; one shared flask model scene
 - [x] Thinner outlines (1 px instead of 2), width / colour adjustable in the Inspector
 - [x] Debug view hotkeys F2–F6 (cel shading, outlines, grain, colour crush, lens), defaults in the
       Inspector
+- [x] Procedural cracks: every hit fractures the glass on the side it came from (crushed spot,
+      spider-web shards, long bending cracks), sized by the hit; smoke-checked in the capture
 - [x] Cel shading keeps the room as dark as without it (it was 89% brighter). The capture test
       measures this
 

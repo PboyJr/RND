@@ -417,6 +417,27 @@ choking can't be switched off: they're gameplay feedback.
 **Why:** the user wanted to compare effects. Grain and colour crush look good on the smooth
 look but choppy over cel shading. Adding a new switch is one line in the table.
 
+## 2026-09-24: Visor cracks are procedural, one fracture per hit
+
+**Decision:** `vfx/Visor.cs` turns each drop in the local player's health into a fracture: where
+it struck the glass, a random seed, and its size (the damage as a fraction of max health). It
+passes up to 12 of them to `visor.gdshader` (`impacts[12]`, as a float array). The 8 fixed
+crack spots are gone.
+- **Where:** toward the nearest evil guy within 4 m, projected through the camera the same way
+  the screen is. Hits from behind or the side land on the rim on that side. There's some
+  scatter. With no enemy nearby (choking), it lands anywhere.
+- **Look:** a frosted crushed spot, spider-web shards around it, and 3–6 long cracks. The shards
+  are Voronoi cells in log-polar space: wedges, small near the impact and growing outward, with
+  most radial edges cracked and fewer ring edges the further out they are. The long cracks bend
+  and kink, hairlines glint unevenly, and each shard shifts and shades the view a little.
+- **Growth:** each fracture spreads out over about 0.2 s. The overall damage makes every crack
+  run further, so the glass still reads as the health bar.
+- **Small hits:** a hit under 6% of max health (choking ticks) spreads the latest fracture
+  instead of starting a new one, so choking doesn't pepper the glass.
+
+**Why:** the user wanted more realistic, procedural cracks. It's also the guiding principle:
+cracks now say where you were hit from.
+
 ---
 
 ## Known limitations / tech debt
@@ -463,3 +484,8 @@ Things the prototype does on purpose that we'll need to revisit:
 - Noise carries no source, only a position and a radius. Hearing a crash sends it to the crash,
   not to whoever threw the crate. Add a source back if AI ever needs to tell noises apart.
 - The thrower's own flask appears after a network round trip (no client-side prediction).
+- Crack direction is a local guess (the nearest evil guy within 4 m), because `Health.Damaged`
+  doesn't carry where a hit came from on clients. Send the hit position with the damage if
+  ranged attackers or several enemies make the guess wrong.
+- Cracks only clear when health is back to full (respawn). Partial healing, if it's ever added,
+  should mend some cracks.

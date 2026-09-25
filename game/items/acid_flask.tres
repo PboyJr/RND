@@ -11,4 +11,4 @@ ThrowLift = 2.5
 DisplayName = "Acid flask"
 ShortName = "ACID"
 Tint = Color(0.45, 1, 0.35, 1)
-Cooldown = 15.0
+Cooldown = 5.0

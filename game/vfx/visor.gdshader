@@ -2,7 +2,8 @@ shader_type canvas_item;
 
 // Everything you see goes through this one pass (driven by vfx/Visor.cs):
 //  1. the scene through a panoramic gas-mask visor: curved glass, blur and colour fringing toward the
-//     rubber rim, breath fog, and cracks that ARE the health bar (more damage = more cracked glass);
+//     rubber rim, breath fog, and cracks that ARE the health bar (every hit fractures the glass where
+//     it came from, and a weaker mask cracks further);
 //  2. the HUD, projected onto the glass (it renders in a SubViewport, see ui/VisorHud.cs);
 //  3. a cheap-camera finish over everything: crushed palette and film grain.
 // With visor_enabled = 0 (menus) only step 3 applies.
@@ -13,6 +14,10 @@ uniform sampler2D hud_texture : filter_linear, hint_default_transparent;
 group_uniforms visor;
 uniform float visor_enabled : hint_range(0.0, 1.0) = 0.0;
 uniform float damage : hint_range(0.0, 1.0) = 0.0;    // 1 - health fraction
+// One fracture per hit, set by Visor.cs: xy = where it struck (visor space), z = random seed,
+// w = its size so far (it spreads out over a moment). Up to 12.
+uniform vec4 impacts[12];
+uniform int impact_count = 0;
 uniform float fog : hint_range(0.0, 1.0) = 0.0;       // breath condensation
 uniform float choke : hint_range(0.0, 1.0) = 0.0;     // spent filter: vision closes in
 uniform float hit_flash : hint_range(0.0, 1.0) = 0.0;
@@ -28,12 +33,6 @@ uniform float color_levels : hint_range(4.0, 256.0) = 48.0;
 uniform bool grain_on = true;
 uniform bool crush_on = true;
 group_uniforms;
-
-// Where each crack starts (xy, visor space) and how much damage it takes before it appears (z).
-const vec3 IMPACTS[8] = vec3[8](
-	vec3(1.05, 0.40, 0.04), vec3(-1.10, -0.28, 0.14), vec3(0.28, -0.50, 0.26), vec3(-0.50, 0.52, 0.38),
-	vec3(1.28, -0.38, 0.50), vec3(-0.12, 0.22, 0.62), vec3(0.72, 0.06, 0.74), vec3(-0.88, 0.08, 0.86)
-);
 
 // Dave Hoskins' hash12: stable noise without sin() precision artifacts.
 float hash12(vec2 p) {
@@ -65,42 +64,111 @@ float jag(float x, float seed) {
 	return mix(hash12(vec2(i, seed)), hash12(vec2(i + 1.0, seed)), fract(x)) - 0.5;
 }
 
-// Star fractures radiating from each impact, plus broken polygonal rings between the spokes.
-// Returns (hairline, dark halo), and nudges `shift` so each shard shows the world slightly askew.
-vec2 cracks(vec2 p, inout vec2 shift) {
-	vec2 result = vec2(0.0);
-	for (int i = 0; i < 8; i++) {
-		float grow = clamp((damage - IMPACTS[i].z) / 0.3, 0.0, 1.0);
-		if (grow <= 0.0) {
-			continue;
+// A shard corner in log-polar cell c (the angle wraps around every `around` cells).
+vec2 shard_point(vec2 c, float around, float seed) {
+	vec2 w = vec2(c.x, mod(c.y, around)) + seed;
+	return c + 0.1 + 0.8 * vec2(hash12(w), hash12(w + 71.3));
+}
+
+// Spider-web shards around an impact: Voronoi cells in log-polar space, so they come out as wedges
+// that are small and dense near the impact and grow with distance. Returns (distance to the nearest
+// shard edge in cell units, whether that edge actually cracked, the shard's random id).
+vec3 shards(vec2 q, float around, float seed, float outer) {
+	vec2 cell = floor(q);
+	vec2 near_cell = cell;
+	vec2 near_rel = vec2(8.0);
+	for (int j = -1; j <= 1; j++) {
+		for (int i = -1; i <= 1; i++) {
+			vec2 c = cell + vec2(float(i), float(j));
+			vec2 rel = shard_point(c, around, seed) - q;
+			if (dot(rel, rel) < dot(near_rel, near_rel)) {
+				near_rel = rel;
+				near_cell = c;
+			}
 		}
-		vec2 d = p - IMPACTS[i].xy;
+	}
+	float near_id = hash12(vec2(near_cell.x, mod(near_cell.y, around)) + seed);
+
+	float edge = 8.0;
+	float cracked = 0.0;
+	for (int j = -2; j <= 2; j++) {
+		for (int i = -2; i <= 2; i++) {
+			vec2 c = near_cell + vec2(float(i), float(j));
+			vec2 rel = shard_point(c, around, seed) - q;
+			vec2 diff = rel - near_rel;
+			if (dot(diff, diff) < 0.0001) {
+				continue;
+			}
+			float e = dot(0.5 * (near_rel + rel), normalize(diff));
+			if (e < edge) {
+				edge = e;
+				// Radial cracks mostly run on; the rings between them break off more and more with
+				// distance, like real spider-web glass.
+				float pair = fract(near_id + hash12(vec2(c.x, mod(c.y, around)) + seed));
+				float keep = abs(diff.y) > abs(diff.x) ? 0.85 : mix(0.95, 0.2, clamp(q.x / outer, 0.0, 1.0));
+				cracked = step(pair, keep);
+			}
+		}
+	}
+	return vec3(edge, cracked, near_id);
+}
+
+// Every fracture (one per hit, see `impacts`): a frosted crushed spot where it struck, spider-web
+// shards around it, and long cracks racing outward that bend and kink. Hairlines catch the light
+// unevenly and cast a dark refraction halo. Each shard sits slightly tilted, so it shows the world a
+// little askew and a little brighter or darker.
+// Returns (hairline, halo, shard shade), and nudges `shift` per shard.
+vec3 cracks(vec2 p, inout vec2 shift) {
+	vec3 result = vec3(0.0);
+	for (int i = 0; i < 12; i++) {
+		if (i >= impact_count) {
+			break;
+		}
+		float size = min(impacts[i].w, 1.0);
+		float seed = impacts[i].z;
+		vec2 d = p - impacts[i].xy;
 		float r = length(d);
-		float radius = mix(0.15, 0.8, grow);
-		if (r > radius) {
+		float reach = 0.12 + 1.5 * size + 0.5 * damage; // a weaker mask lets every crack run further
+		if (size <= 0.0 || r > reach) {
 			continue;
 		}
+		float angle = atan(d.y, d.x);
+		float line = 0.0;
+		float halo = 0.0;
 
-		float seed = float(i) * 17.31;
-		float spokes = 5.0 + floor(hash12(vec2(seed, 1.0)) * 5.0);
-		float sector = (atan(d.y, d.x) / TAU + 0.5) * spokes;
+		float crush_r = 0.006 + 0.02 * size;
+		float crush = (1.0 - smoothstep(crush_r * 0.5, crush_r, r)) * (0.5 + 0.5 * hash12(floor(p * 900.0) + seed));
+
+		float web_r = 0.04 + 0.4 * size + 0.1 * damage;
+		if (r < web_r) {
+			const float CORE = 0.004;
+			float around = 8.0 + floor(hash12(vec2(seed, 2.0)) * 6.0);
+			float a = around / TAU; // cells per radian, the same both ways, so shards stay shard-shaped
+			vec2 q = vec2(log(max(r, CORE) / CORE) * a, (angle / TAU + 0.5) * around);
+			vec3 web = shards(q, around, seed, log(web_r / CORE) * a);
+			float dist = web.x * max(r, CORE) / a; // cell units back to visor units
+			float fade = 1.0 - smoothstep(web_r * 0.7, web_r, r);
+			line = (1.0 - smoothstep(0.0012, 0.0032, dist)) * web.y * fade;
+			halo = (1.0 - smoothstep(0.0, 0.009, dist)) * web.y * fade;
+			shift += (vec2(hash12(vec2(web.z, 1.0)), hash12(vec2(web.z, 2.0))) - 0.5) * 0.006 * size * fade;
+			result.z += (web.z - 0.5) * 0.12 * fade;
+		}
+
+		float spokes = 3.0 + floor(hash12(vec2(seed, 1.0)) * 4.0);
+		float sector = (angle / TAU + 0.5) * spokes;
 		float id = floor(sector);
-		float angle_in_sector = (fract(sector) - 0.5 - (hash12(vec2(id, seed)) - 0.5) * 0.6) * TAU / spokes;
-		float offset = angle_in_sector * r + jag(r * 16.0, id + seed) * 0.024; // straight, with kinks
-		float reach = radius * mix(0.45, 1.0, hash12(vec2(seed, id)));
-		float fade = step(r, reach) * (1.0 - r / reach * 0.5);
+		float bend = (hash12(vec2(id, seed + 4.0)) - 0.5) * 0.5;
+		float across = (fract(sector) - 0.5 - (hash12(vec2(id, seed)) - 0.5) * 0.5) * TAU / spokes - bend * r;
+		float offset = across * r + jag(r * 16.0, id + seed) * 0.022 * smoothstep(0.0, 0.15, r);
+		float spoke_reach = reach * mix(0.45, 1.0, hash12(vec2(seed, id)));
+		float spoke = step(r, spoke_reach) * (1.0 - r / spoke_reach * 0.6);
+		line = max(line, (1.0 - smoothstep(0.0012, 0.0032, abs(offset))) * spoke);
+		halo = max(halo, (1.0 - smoothstep(0.0, 0.01, abs(offset))) * spoke);
+		shift += (vec2(hash12(vec2(id, seed + 3.0)), hash12(vec2(seed + 5.0, id))) - 0.5) * 0.002 * size * spoke;
 
-		float line = (1.0 - smoothstep(0.0012, 0.0035, abs(offset))) * fade;
-		float halo = (1.0 - smoothstep(0.0, 0.012, abs(offset))) * fade;
-		// Rings break into straight chords between neighbouring spokes, and only some of them.
-		float ring_r = reach * mix(0.3, 0.5, hash12(vec2(id, seed + 11.0)));
-		float chord = r * cos(angle_in_sector);
-		float ring = (1.0 - smoothstep(0.0012, 0.0035, abs(chord - ring_r)))
-			* step(0.45, hash12(vec2(id, seed + 7.0))) * step(ring_r, reach);
-		float chip = 1.0 - smoothstep(0.0, 0.02, r);
-
-		result = max(result, vec2(max(max(line, ring), chip), max(halo * 0.6, chip)));
-		shift += (vec2(hash12(vec2(id, seed + 3.0)), hash12(vec2(seed + 5.0, id))) - 0.5) * 0.004 * grow;
+		float glint = 0.4 + 0.6 * value_noise(vec2(r * 30.0, angle * 3.0) + seed);
+		result.x = max(result.x, max(line * glint, crush));
+		result.y = max(result.y, max(halo * 0.6, crush * 0.5));
 	}
 	return result;
 }
@@ -117,7 +185,7 @@ void fragment() {
 	float near_rim = 1.0 - smoothstep(0.0, 0.35, gd);
 
 	vec2 shift = vec2(0.0);
-	vec2 crack = vec2(0.0);
+	vec3 crack = vec3(0.0);
 	if (on > 0.0) {
 		crack = cracks(p, shift);
 	}
@@ -156,7 +224,7 @@ void fragment() {
 	col = mix(col, hud.rgb, hud.a * hud_on) + glow.rgb * glow.a * 0.35 * hud_on;
 
 	// Cracks: bright hairlines with a dark halo.
-	col *= 1.0 - crack.y * 0.35;
+	col *= (1.0 + crack.z) * (1.0 - crack.y * 0.35);
 	col = mix(col, vec3(0.82, 0.86, 0.86), crack.x * 0.7);
 
 	// A hit flashes around the rim.

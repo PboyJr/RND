@@ -116,9 +116,9 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
   - Equip it on the hotbar and press LMB to lob it on an arc. It shatters on the first surface,
     prop or entity it touches and splashes acid in a **2 m radius**.
   - **50 damage** on a direct hit, dropping to 50% at the splash edge.
-  - Recharges for **15 s** after each throw. There's no ammo; it just refills. **The recharge
-    shows on the flask itself:** after a throw, the flask in your hand is empty, and its acid
-    rises back up over the 15 s. Everyone looking at you sees it too.
+  - Recharges for **5 s** after each throw (was 15 s). There's no ammo; it just refills. **The
+    recharge shows on the flask itself:** after a throw, the flask in your hand is empty, and its
+    acid rises back up over the 5 s. Everyone looking at you sees it too.
   - No friendly fire for now (the splash skips players). `Open`: should it hurt teammates?
   - `Idea`: leave an acid puddle that damages over time, for area denial and kiting.
 - `Open`: other archetypes and their kits.
@@ -145,10 +145,14 @@ Everything you see is through a **panoramic full-face gas mask**, like a modern 
 twin lenses. Twin-lens tunnel vision would fight the evil guy's vision cone, since you need to see
 it coming from the sides.
 
-- **The cracks are your health bar.** There's no health number on screen. Each hit spreads
-  fracture lines across the glass (8 impact points, each appearing at a set damage level, then
-  growing), and each shard shows the world slightly askew. At low health you're looking through
-  shattered glass. Respawning gives you a clean mask.
+- **The cracks are your health bar.** There's no health number on screen. **Every hit fractures
+  the glass where it came from** (the evil guy swiping from your left cracks the left side; from
+  behind, the rim), sized by how hard it hit, with a new random pattern each time: a crushed,
+  frosted spot, spider-web shards around it, and long cracks racing outward that bend, kink and
+  catch the light. Each shard shows the world slightly askew. The weaker the mask, the further
+  every crack runs, so at low health you're looking through shattered glass. Small knocks
+  (choking) spread the latest crack instead of starting a new one. Respawning gives you a clean
+  mask.
 - **Breath fog** pools low around your mouth and pulses with each exhale. Breathing speeds up
   and fogs more when you sprint, and stays heavy for a few seconds after. A tired filter leaves
   the mask clammier.

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using RND.Audio;
 using RND.Combat;
@@ -26,6 +28,8 @@ public partial class Level : Node3D
 	private Node3D _enemies;
 	private Node3D _projectiles;
 	private bool _spawningPlayers;
+
+	public IEnumerable<Enemy> Enemies => _enemies.GetChildren().OfType<Enemy>();
 
 	public override void _EnterTree() => Current = this;
 
