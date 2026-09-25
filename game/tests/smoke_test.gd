@@ -127,7 +127,7 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 	var full_fill: float = hand_liquid.Fill
 	player.UseSelectedItem() # the host refuses it (still recharging), but our own flask empties
 	await _frames(2)
-	_check(full_fill > 0.5 and hand_liquid.Fill < 0.02, "offline: thrown flask didn't empty in hand (%.2f -> %.2f)" % [full_fill, hand_liquid.Fill])
+	_check(full_fill > 0.3 and hand_liquid.Fill < 0.02, "offline: thrown flask didn't empty in hand (%.2f -> %.2f)" % [full_fill, hand_liquid.Fill])
 	await _seconds(1.5)
 	var expected: float = full_fill * 1.5 / flask.Cooldown
 	_check(absf(hand_liquid.Fill - expected) < 0.06, "offline: flask in hand isn't refilling with the recharge (%.2f, expected %.2f)" % [hand_liquid.Fill, expected])

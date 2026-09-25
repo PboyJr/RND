@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://models/erlenmeyer_flask.glb" id="1_model"]
+[ext_resource type="PackedScene" path="res://models/graduated_cylinder.glb" id="1_model"]
 [ext_resource type="Script" path="res://vfx/Liquid.cs" id="2_liquid"]
 [ext_resource type="Shader" path="res://vfx/liquid.gdshader" id="3_liquid_shader"]
 [ext_resource type="Material" path="res://models/glass.tres" id="4_glass"]
@@ -9,13 +9,13 @@
 render_priority = 0
 shader = ExtResource("3_liquid_shader")
 
-[node name="ErlenmeyerFlask" instance=ExtResource("1_model")]
+[node name="GraduatedCylinder" instance=ExtResource("1_model")]
 
-[node name="Glass" parent="." index="0"]
+[node name="Glass" parent="."]
 surface_material_override/0 = ExtResource("4_glass")
 
-[node name="Liquid" parent="." index="1"]
+[node name="Liquid" parent="."]
 surface_material_override/0 = SubResource("ShaderMaterial_liquid")
 script = ExtResource("2_liquid")
-Fill = 0.45
-Color = Color(0.65, 0.2, 1, 1)
+Color = Color(0.85, 1, 0.05, 1)
+Glow = 1.2

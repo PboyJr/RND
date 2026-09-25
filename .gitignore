@@ -20,3 +20,7 @@ builds/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Blender backups
+*.blend1
+__pycache__/

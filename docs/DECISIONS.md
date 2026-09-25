@@ -440,6 +440,25 @@ cracks now say where you were hit from.
 
 ---
 
+## 2026-09-25: Models are built by Blender scripts, sources in an ignored src folder
+
+**Decision:** each model in `game/models/` is `<name>.glb` (the export Godot imports) and
+`<name>.tscn` (the game-ready scene: the `.glb` plus materials and scripts; vessels share
+`glass.tres`). Its sources are in `game/models/src/`: `<name>.py` (Blender Python that builds it)
+and `<name>.blend` (what it builds, for hand-tweaking), with shared helpers in `model_tools.py`.
+`src/` has a `.gdignore`, because Godot 4.7 imports `.blend` files itself whenever Blender is
+installed, even with `filesystem/import/blender/enabled=false` (tried; it still made
+`.blend.import` files). `*.blend1` backups are gitignored. The first model is the Erlenmeyer flask:
+glass shell (1,920 tris) and a closed `Liquid` mesh (832 tris), 21 cm tall, lathed from a profile.
+
+**Why:** a script is diffable and rebuilds exactly, and Claude can model through it (the Blender MCP
+tools weren't available in the session, headless Blender was). Keeping the `.blend` means an artist
+can still open it and work by hand. After that, the `.blend` is the source and the script is stale,
+so note that in the script's header.
+
+**Note:** the flask's `Liquid` now fills the neck too, so the same `Fill` sits higher than on the
+placeholder. The model scene sets `Fill = 0.45` to keep about the same level.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -489,3 +508,6 @@ Things the prototype does on purpose that we'll need to revisit:
   ranged attackers or several enemies make the guess wrong.
 - Cracks only clear when health is back to full (respawn). Partial healing, if it's ever added,
   should mend some cracks.
+- Rebuilding the C# code or reimporting assets from the command line while the Godot editor is
+  open can leave the editor running stale state (seen 2026-09-25: the evil guy saw you but never
+  left his spawn). Close Godot fully and reopen the project.

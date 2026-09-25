@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (backlog: game modes, psychosis / rat lore)
+Last updated: 2026-09-25 (real flask and graduated cylinder models; backlog: game modes, psychosis / rat lore)
 
 ---
 
@@ -83,6 +83,8 @@ Goal: sound sells the mask as much as the visor does.
       compare (tuned so the dim room stays readable)
 - [x] Liquid shader + slosh: level-in-the-world surface, sloshes and settles, fill and glow
 - [x] Placeholder Erlenmeyer flask prop, ready for the real model (steps in ART.md)
+- [x] Real Erlenmeyer flask model (Blender, built by script in `game/models/src/`), same scene for prop, hand and throw
+- [x] Graduated cylinder prop (100 ml, true-to-volume scale marks, neon yellow liquid) on the lab table
 - [x] Capture shots: toon off / on, liquid still / mid-slosh; smoke check that liquid sloshes and settles
 - [x] Acid beaker → **acid flask**: the Erlenmeyer flask in your hand (and thrown), its acid
       refilling over its recharge (now 5 s), visible to everyone; one shared flask model scene

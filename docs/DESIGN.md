@@ -146,7 +146,7 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 
 - The "main scientist guy". Kit: **acid flask**.
 - **Acid flask** (`Decided` for the prototype, numbers still being tuned): an Erlenmeyer flask
-  of glowing acid.
+  of glowing purple acid (colour is `Color` on `Liquid` in `models/erlenmeyer_flask.tscn`).
   - Equip it on the hotbar and press LMB to lob it on an arc. It shatters on the first surface,
     prop or entity it touches and splashes acid in a **2 m radius**.
   - **50 damage** on a direct hit, dropping to 50% at the splash edge.

@@ -53,12 +53,34 @@ The outlines are thin (1 px) by default. To change their width, colour or how ma
 lines: select `Main/ToonStyle` in `core/main.tscn` → **Outline Material** → Shader Parameters
 (`Thickness`, `Line Color`, `Depth Threshold`, `Normal Threshold`, `Fade Distance`).
 
-## Dropping in the Erlenmeyer flask
+## The models folder
+
+`game/models/` holds what the game uses, one set of files per model with the same name. The
+sources live in `game/models/src/`, which Godot ignores (it has a `.gdignore`), so nobody needs
+Blender set up in Godot.
+
+| File | What it is |
+|---|---|
+| `name.tscn` | The game-ready scene: the `.glb` plus materials and scripts. Game scenes instance this |
+| `name.glb` | The export Godot imports. Never edit it, re-export it |
+| `glass.tres` | The shared glass material (transparent, rim light) for every vessel |
+| `src/name.blend` | The Blender file. Open it to tweak by hand |
+| `src/name.py` | Blender Python that builds the model (if it was built by script) |
+
+Shared helpers for the build scripts (rounded profiles, lathing, export) are in `src/model_tools.py`.
+Rebuild a scripted model (writes `src/name.blend` and `name.glb`):
+`blender --background --factory-startup --python game/models/src/name.py`. Once someone edits the
+`.blend` by hand, the `.blend` becomes the source: export from it to `game/models/name.glb`, and
+don't rerun the script.
+
+## The Erlenmeyer flask
 
 The flask is the Scientist's **acid flask**: it sits on tables as a prop, it's in your hand (its
 acid refills as it recharges), and it's what you throw. All three use one model scene,
-`game/models/erlenmeyer_flask.tscn`: a grey-box placeholder right now (cone, neck, and a `Liquid`
-cone that sloshes). Replace that one scene and all three update:
+`game/models/erlenmeyer_flask.tscn`. The real model is in (21 cm tall, 15 cm wide, glass with a
+rolled lip, plus a `Liquid` mesh that fills the inside up into the neck), built by
+`src/erlenmeyer_flask.py`. To replace it with a different model, follow these steps and all three
+update:
 
 1. Export the flask as `.glb` (see above) with two meshes, `Glass` and `Liquid`, origin at the
    bottom centre, and put it in `game/models/`.
@@ -69,7 +91,7 @@ cone that sloshes). Replace that one scene and all three update:
    
    Fill, colour, glow and slosh feel are in the Inspector. (Fill is how full the flask is when
    the acid is charged; in your hand it refills from empty up to that.)
-4. Give **`Glass`** a transparent material (or copy the placeholder's: low alpha, rim light on).
+4. Give **`Glass`** the shared glass material, `models/glass.tres`.
 5. **Save** it over `models/erlenmeyer_flask.tscn`.
 6. If it's a different size from the placeholder (21 cm tall, 16 cm wide): resize the collision
    cylinder in `props/erlenmeyer_flask.tscn`, and move `Model` down by half the flask's height

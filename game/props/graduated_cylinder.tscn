@@ -1,0 +1,46 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://props/PhysicsProp.cs" id="1_prop"]
+[ext_resource type="PackedScene" path="res://models/graduated_cylinder.tscn" id="2_model"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_foot"]
+height = 0.011
+radius = 0.034
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_tube"]
+height = 0.24
+radius = 0.015
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_prop"]
+properties/0/path = NodePath(".:SyncPosition")
+properties/0/spawn = false
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:SyncRotation")
+properties/1/spawn = false
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:HeldBy")
+properties/2/spawn = false
+properties/2/replication_mode = 2
+
+[node name="GraduatedCylinder" type="RigidBody3D"]
+collision_layer = 4
+collision_mask = 15
+mass = 0.25
+continuous_cd = true
+script = ExtResource("1_prop")
+DisplayName = "Graduated cylinder"
+
+[node name="Foot" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1195, 0)
+shape = SubResource("CylinderShape3D_foot")
+
+[node name="Tube" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.005, 0)
+shape = SubResource("CylinderShape3D_tube")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.125, 0)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_interval = 0.033
+replication_config = SubResource("SceneReplicationConfig_prop")
