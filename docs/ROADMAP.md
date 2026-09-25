@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-24 (after M6: acid flask, thinner outlines)
+Last updated: 2026-09-25 (backlog: game modes, psychosis / rat lore)
 
 ---
 
@@ -124,6 +124,12 @@ Rough order, and likely to change:
 - **Persistent characters + decay:** needs the "where saves live" decision (see DESIGN)
 - **Rebirth / prestige**
 - **Player-controlled monsters:** prototype on PC first, then decide on the phone client
+- **More game modes** (idea): maze solving, payload delivery, and a Research mode, alongside
+  REPO-style retrieval (see DESIGN → Game modes). A maze would be the first thing to prototype,
+  since psychosis builds up in it.
+- **Psychosis + rat lore** (idea): the longer you stay in the maze, the more likely you and your
+  friends start to look like rats, which is the truth. Needs rat models (see ART.md) and a
+  per-player status effect (see DESIGN → Lore).
 - **Art pass:** real mid-poly models, lighting, sound
 - **Our own backend:** character persistence, phone relay
 

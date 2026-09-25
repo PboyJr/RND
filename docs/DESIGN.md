@@ -5,7 +5,7 @@ actually decided.
 
 **Status tags:** `Decided` · `Leaning` (probably, not locked) · `Idea` (on the table) · `Open` (needs an answer)
 
-Last updated: 2026-09-24
+Last updated: 2026-09-25
 
 ---
 
@@ -24,6 +24,20 @@ entities live. Collect evidence, data and specimens, get out alive, and sell wha
 to the government, or to the black market for more money and a chance of getting caught.
 
 Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sans, muahahaha).
+
+## Lore (`Idea`, 2026-09-25)
+
+- **The scientists are actually rats.** Each one is a rat with a human brain uploaded into it.
+- **Why the modes differ:** the real scientists are testing whether humans inside rat bodies are
+  smarter than actual rats, so they put them in different environments (see
+  [Game modes](#game-modes-idea-2026-09-25)).
+- **Psychosis** (working name): the longer you stay in the maze, the more likely you are to get a
+  status effect that makes you and your friends **look like rats**. It feels like a
+  hallucination, but it's actually the truth.
+- `Open`: how this fits the existing pitch (researchers selling evidence to the government or the
+  black market). Who is buying, and who are the "entities" to a rat?
+- `Open`: how psychosis builds up (time in the maze only, or other triggers too?), what it does
+  besides the rat visuals, and how you get rid of it.
 
 ## Inspiration
 
@@ -57,6 +71,26 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 3. Extract
 4. Sell: government or black market
 5. Between rounds: upgrades, research tree, crate opening
+
+This is the loop for REPO-style retrieval. That may be just one of several modes (below).
+
+## Game modes (`Idea`, 2026-09-25)
+
+The game could have multiple modes, with REPO-style retrieval as one of them:
+
+1. **REPO-style retrieval**: the core loop above.
+2. **Maze solving**
+3. **Payload delivery**
+4. **Research**: like "that Factory Roblox game".
+
+In the lore, the modes are different test environments, built to check whether humans in rat
+bodies beat real rats (see [Lore](#lore-idea-2026-09-25)).
+
+- `Open`: what each of maze solving, payload delivery and research plays like, round to round.
+- `Open`: which Roblox factory game is the reference for Research mode? And how does that mode
+  relate to the Factorio-style research tree between rounds?
+- `Open`: are the modes picked per round, per run, or voted on? Do they share upgrades and
+  characters?
 
 ---
 
@@ -299,3 +333,5 @@ The mask's filter runs out, and that's a core pressure mechanic.
 - [ ] The evil guy's lore, and whether it can be researched
 - [ ] Filter tuning: is 180 s right? Should swapping take time? Where do spares come from in real levels?
 - [ ] Do the cracks read clearly enough to drop the debug health bar?
+- [ ] Game modes: which ones, and what does each play like? (see Game modes)
+- [ ] Rat lore: does it replace or reframe the "researchers selling evidence" pitch? (see Lore)

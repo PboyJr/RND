@@ -3,7 +3,7 @@
 How models get from Blender (or anywhere) into the game, and who does what. The visual direction
 lives in [DESIGN.md](DESIGN.md#visual-style-leaning).
 
-Last updated: 2026-09-24
+Last updated: 2026-09-25
 
 ---
 
@@ -79,6 +79,19 @@ cone that sloshes). Replace that one scene and all three update:
 Everything else (carrying, throwing, networking, the liquid staying level, sloshing and
 refilling) already works.
 
+## Coming up if the rat lore sticks (idea)
+
+In the lore idea (see [DESIGN.md](DESIGN.md#lore-idea-2026-09-25)), the researchers are really
+rats with uploaded human brains. The **psychosis** effect makes players see themselves and each
+other as rats. That would need:
+
+- **A rat version of the researcher** that can swap in for the human model on the same
+  character: same rough size and origin, so it can reuse the collision, carrying and hands.
+- **Rat hands / paws for first person** (the hotbar item and carried props are held in front of
+  the camera), if psychosis also changes what you see of yourself.
+- Whether the rat still wears the gas mask is an open question: it's the whole HUD.
+
 ## Open questions
 
 - [ ] Cel shading: keep it? (Prototype is in; compare with F2.)
+- [ ] Rats: does the rat keep the gas mask and lab gear, and how "cartoon" vs "gross" should it be?
