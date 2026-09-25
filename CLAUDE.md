@@ -34,10 +34,25 @@ update the matching doc in the same turn:
 - Networking rules: transport only in `core/Network.cs`; player movement is client-authoritative;
   props, health, enemies and projectiles are host-authoritative (clients send requests via RPC).
   See DECISIONS before changing.
-- Anything that makes a sound gameplay should care about calls `Level.EmitNoise(position,
-  radius)` on the host. Enemies decide for themselves whether they heard it.
+- Anything audible calls `Level.EmitSound(position, radius, SoundKind)` on the host: players hear
+  it (World bus, muffled by the mask) and enemies hear it (`Hear`) at the same radius. Silent
+  AI-only noise uses `Level.EmitNoise`. New sounds are recipes in `audio/SoundBank.cs`.
+- Claude can't listen: after changing any sound, run the smoke test's `audio` role (clipping and
+  silence checks) and hand the rendered .wav files to the user to judge by ear. For the in-game
+  balance, run the `capture` role and read its bus meter log. Don't trust `AudioEffectRecord` on
+  the dev machine: it's 7.1 surround, and the recorder misses non-positional sound.
+- Atmosphere-only sounds (ambience) go through `audio/Ambience.cs`, not `EmitSound`.
+- Materials: author ordinary `StandardMaterial3D`s. `vfx/ToonStyle.cs` turns opaque ones into the
+  cel-shaded look at runtime (F2 toggles it), and animating the original's albedo or emission still
+  works. Liquids: a closed `Liquid` mesh + `vfx/Liquid.cs` + `vfx/liquid.gdshader`. A model used
+  in several places (prop, in hand, thrown) is one scene in `models/`, instanced by each.
 - Enemies only act on what they perceive (sight cone, hearing, memory). Don't give AI direct
   access to player positions it couldn't know.
-- Anything damageable gets a `Health` child (`combat/Health.cs`). New hotbar items are `.tres`
+- Anything damageable gets a `Health` child (`combat/Health.cs`).
+- HUD: things that belong "in the mask" go in `ui/visor_hud.tscn` (projected through the visor
+  shader, phosphor green, and they must avoid the nose cup at the bottom centre). Menus and
+  debug go in `ui/hud.tscn` (crisp). Health is shown by visor cracks, not a number.
+- Shader and visual changes can't be verified headless: run the smoke test's `capture` role
+  (windowed, opens a window for a few seconds) and look at the screenshots. New hotbar items are `.tres`
   files (`items/`), added to a player's `Loadout`. New spawnable scenes must be listed in the
   level's matching MultiplayerSpawner.

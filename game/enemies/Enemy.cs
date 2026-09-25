@@ -1,4 +1,5 @@
 using Godot;
+using RND.Audio;
 using RND.Combat;
 using RND.Core;
 using RND.Levels;
@@ -15,7 +16,7 @@ namespace RND.Enemies;
 /// It only knows what it perceives:
 /// - Sight: a vision cone (plus a small all-round sense up close), blocked by walls. Being sure it saw
 ///   someone takes longer the further away they are, so you can slip past at a distance.
-/// - Hearing: footsteps (sprinting is loud), shattering beakers and props crashing, muffled by walls.
+/// - Hearing: footsteps (sprinting is loud), shattering flasks and props crashing, muffled by walls.
 /// Lose it and it heads for where you were going, then searches the area before giving up. It always
 /// follows the navmesh (including drop-down links off ledges), shoves props out of its way and
 /// sidesteps when wedged.
@@ -258,7 +259,10 @@ public partial class Enemy : CharacterBody3D
 
 	private void StartChase(Player player)
 	{
-		_target = player;
+		bool spotted = _target == null;
+		_target = player; // set first, so it doesn't turn round to investigate its own growl
+		if (spotted)
+			Voice(SoundKind.Growl, 12f); // "it's seen me" (and it tells any others nearby)
 		_suspicion = 1f;
 		_timeSinceSeen = 0f;
 		_lastSeenPosition = player.GlobalPosition;
@@ -321,6 +325,7 @@ public partial class Enemy : CharacterBody3D
 				if (_stateTimer <= 0f)
 				{
 					Telegraphing = false;
+					Voice(SoundKind.Swipe, 5f);
 					if (_target != null && IsWithin(_target, AttackReach))
 						_target.Health.TakeDamage(AttackDamage, 0);
 					EnterState(State.Recover, RecoverSeconds);
@@ -370,9 +375,14 @@ public partial class Enemy : CharacterBody3D
 		if (visible && IsWithin(_target, AttackRange))
 		{
 			Telegraphing = true;
+			Voice(SoundKind.Growl, 8f); // audible telegraph: you can hear the swing coming
 			EnterState(State.Windup, WindupSeconds);
 		}
 	}
+
+	// Host only. Heard by players and by other enemies alike.
+	private void Voice(SoundKind sound, float radius) =>
+		Level.Current?.EmitSound(GlobalPosition + Vector3.Up * EyeHeight, radius, sound);
 
 	// Go to the spot, look around, then check other spots nearby until time runs out.
 	private void UpdateSearch(float dt)
@@ -446,6 +456,7 @@ public partial class Enemy : CharacterBody3D
 			return;
 
 		Level.Current?.Effects.Rpc(nameof(Effects.Splash), GlobalPosition + Vector3.Up * 0.05f, Vector3.Up, new Color(0.12f, 0.02f, 0.03f, 0.9f), 1.6f);
+		Voice(SoundKind.Splat, 10f);
 		QueueFree(); // despawns on every client
 	}
 

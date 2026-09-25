@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Godot;
+using RND.Audio;
 using RND.Combat;
 using RND.Core;
 using RND.Levels;
@@ -33,13 +34,13 @@ public partial class SplashProjectile : Node3D
 	// Shatters on world geometry, props and entities. Passes through players so teammates don't block throws.
 	private const uint HitMask = Layers.World | Layers.Props | Layers.Entities;
 
-	private Node3D _mesh;
+	private Node3D _model;
 	private float _age;
 	private bool _shattered;
 
-	// The mesh starts hidden (see the scene): it launches from the thrower's eyes and is shown once
+	// The model starts hidden (see the scene): it launches from the thrower's eyes and is shown once
 	// it's clear of their camera.
-	public override void _Ready() => _mesh = GetNode<Node3D>("Mesh");
+	public override void _Ready() => _model = GetNode<Node3D>("Model");
 
 	public override void _PhysicsProcess(double delta)
 	{
@@ -60,8 +61,8 @@ public partial class SplashProjectile : Node3D
 		}
 
 		GlobalPosition = to;
-		_mesh.RotateObjectLocal(Vector3.Right, 12f * dt); // tumble
-		_mesh.Visible = _age > 0.03f;
+		_model.RotateObjectLocal(Vector3.Right, 12f * dt); // tumble
+		_model.Visible = _age > 0.03f;
 
 		if (_age > MaxLifetime)
 			Shatter(GlobalPosition, Vector3.Up, null);
@@ -78,7 +79,7 @@ public partial class SplashProjectile : Node3D
 
 		DealSplashDamage(point, directHit);
 		Level.Current?.Effects.Rpc(nameof(Vfx.Effects.Splash), point, normal, SplashColor, SplashRadius);
-		Level.Current?.EmitNoise(point, ShatterNoiseRadius);
+		Level.Current?.EmitSound(point, ShatterNoiseRadius, SoundKind.Shatter);
 		QueueFree();
 	}
 

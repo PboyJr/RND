@@ -7,6 +7,9 @@
 [ext_resource type="PackedScene" path="res://props/specimen_jar.tscn" id="5_jar"]
 [ext_resource type="PackedScene" path="res://enemies/enemy.tscn" id="6_enemy"]
 [ext_resource type="Script" path="res://vfx/Effects.cs" id="7_effects"]
+[ext_resource type="PackedScene" path="res://props/filter_canister.tscn" id="8_filter"]
+[ext_resource type="Script" path="res://audio/Ambience.cs" id="9_ambience"]
+[ext_resource type="PackedScene" path="res://props/erlenmeyer_flask.tscn" id="10_flask"]
 
 [sub_resource type="Environment" id="Environment_facility"]
 background_mode = 1
@@ -175,6 +178,21 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.5, 1.175, -6.5)
 [node name="JarD" parent="Props" instance=ExtResource("5_jar")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.075, -6)
 
+[node name="FilterA" parent="Props" instance=ExtResource("8_filter")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.08, 6.5)
+
+[node name="FilterB" parent="Props" instance=ExtResource("8_filter")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.6, 0.98, -5.8)
+
+[node name="FilterC" parent="Props" instance=ExtResource("8_filter")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1.08, -5)
+
+[node name="FlaskA" parent="Props" instance=ExtResource("10_flask")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.3, 1.01, -6.2)
+
+[node name="FlaskB" parent="Props" instance=ExtResource("10_flask")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.11, 6.8)
+
 [node name="Players" type="Node3D" parent="."]
 
 [node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
@@ -190,11 +208,14 @@ spawn_path = NodePath("../Enemies")
 [node name="Projectiles" type="Node3D" parent="."]
 
 [node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://items/acid_beaker_projectile.tscn")
+_spawnable_scenes = PackedStringArray("res://items/acid_flask_projectile.tscn")
 spawn_path = NodePath("../Projectiles")
 
 [node name="Effects" type="Node3D" parent="."]
 script = ExtResource("7_effects")
+
+[node name="Ambience" type="Node3D" parent="."]
+script = ExtResource("9_ambience")
 
 [node name="SpawnPoints" type="Node3D" parent="."]
 

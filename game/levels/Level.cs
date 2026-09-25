@@ -1,4 +1,5 @@
 using Godot;
+using RND.Audio;
 using RND.Combat;
 using RND.Enemies;
 using RND.Items;
@@ -80,6 +81,20 @@ public partial class Level : Node3D
 
 		foreach (Node child in _enemies.GetChildren())
 			(child as Enemy)?.Hear(position, radius);
+	}
+
+	/// <summary>
+	/// Host only. A sound everyone hears: players through their speakers (muffled by their mask),
+	/// enemies through Hear(), at the same radius, so the AI never hears something you couldn't.
+	/// Silent AI-only noise (footsteps, for now) uses EmitNoise.
+	/// </summary>
+	public void EmitSound(Vector3 position, float radius, SoundKind sound)
+	{
+		if (!Multiplayer.IsServer())
+			return;
+
+		EmitNoise(position, radius);
+		Effects.Rpc(nameof(Effects.PlaySound), (int)sound, position, radius);
 	}
 
 	/// <summary>Host only. The ProjectileSpawner must list the projectile's scene.</summary>

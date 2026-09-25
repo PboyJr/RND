@@ -35,8 +35,17 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 ## Visual style (`Leaning`)
 
 - 3D, mid-poly, static / grainy "cheap camera" look.
+- **Cel shading (`Leaning`, prototype in; F2 toggles it to compare):** light falls into three
+  hard bands (deep shadow, mid, lit) from an editable colour ramp, with ink outlines on every
+  edge (thin, 1 px by default; the width is adjustable). It reads like a dark comic: hard-edged
+  warm light pools on the walls, crisp props, and the evil guy as a silhouette with glowing eyes.
+  It's done in code over ordinary materials, so it applies to everything including grey-box (see
+  [ART.md](ART.md)). Keep the ramp's low end dark so shadows stay scary.
+- **Liquids** (flasks, specimen jars): glowing liquid that stays level in the world, sloshes when
+  you move or throw the container, and settles. Fill level is controllable: the acid flask in
+  your hand refills as it recharges.
 - The prototype already has a grain pass: film grain, a slightly crushed palette, colour fringing
-  and a vignette (`game/vfx/grain.gdshader`). UI draws above it and stays crisp.
+  and a vignette (part of `game/vfx/visor.gdshader`). UI draws above it and stays crisp.
 
 ## Core loop (`Leaning`)
 
@@ -98,12 +107,15 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 
 #### The Scientist (first archetype, in the prototype)
 
-- The "main scientist guy". Kit: **acid beaker**.
-- **Acid beaker** (`Decided` for the prototype, numbers still being tuned):
+- The "main scientist guy". Kit: **acid flask**.
+- **Acid flask** (`Decided` for the prototype, numbers still being tuned): an Erlenmeyer flask
+  of glowing acid.
   - Equip it on the hotbar and press LMB to lob it on an arc. It shatters on the first surface,
     prop or entity it touches and splashes acid in a **2 m radius**.
   - **50 damage** on a direct hit, dropping to 50% at the splash edge.
-  - Recharges for **15 s** after each throw. There's no ammo; it just refills.
+  - Recharges for **15 s** after each throw. There's no ammo; it just refills. **The recharge
+    shows on the flask itself:** after a throw, the flask in your hand is empty, and its acid
+    rises back up over the 15 s. Everyone looking at you sees it too.
   - No friendly fire for now (the splash skips players). `Open`: should it hurt teammates?
   - `Idea`: leave an acid puddle that damages over time, for area denial and kiting.
 - `Open`: other archetypes and their kits.
@@ -113,17 +125,84 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 - Slot 1 is always **Hands** (grab / carry / throw props). Slots 2–5 hold the archetype's kit.
 - Keys **1–5** select a slot. **Scroll** cycles slots, except while carrying a prop, when it
   pushes / pulls it.
-- **LMB uses whatever is selected** (grab with Hands, throw the beaker, and so on).
-- Each slot shows its recharge time. Everyone can see what you're holding (the beaker appears in
-  your hand while it's charged).
+- **LMB uses whatever is selected** (grab with Hands, throw the flask, and so on).
+- Each slot shows its recharge time. Everyone can see what you're holding (the flask is in your
+  hand, its acid refilling while it recharges).
 
 ### Health, damage, death (`Leaning`)
 
 - Players: **100 HP**. Death is a placeholder: you fall over, then **respawn at a spawn point
-  after 8 s** at full health. `Open`: REPO-style revive-by-teammate instead? Does death cost
-  money or research?
-- Hits flash the body; the local player gets a red screen flash, a health bar and a respawn
-  countdown.
+  after 8 s** at full health, with a fresh mask and filter. `Open`: REPO-style revive-by-teammate
+  instead? Does death cost money or research?
+- Hits flash your body for everyone else. For you, they crack your visor (see below).
+
+### The gas mask HUD (`Decided`)
+
+Everything you see is through a **panoramic full-face gas mask**, like a modern respirator, not
+twin lenses. Twin-lens tunnel vision would fight the evil guy's vision cone, since you need to see
+it coming from the sides.
+
+- **The cracks are your health bar.** There's no health number on screen. Each hit spreads
+  fracture lines across the glass (8 impact points, each appearing at a set damage level, then
+  growing), and each shard shows the world slightly askew. At low health you're looking through
+  shattered glass. Respawning gives you a clean mask.
+- **Breath fog** pools low around your mouth and pulses with each exhale. Breathing speeds up
+  and fogs more when you sprint, and stays heavy for a few seconds after. A tired filter leaves
+  the mask clammier.
+- **The mask sways**: the rim lags a little behind where you look and jolts when you're hit.
+- **The HUD is projected onto the glass** in phosphor green (hotbar, hints, crosshair, filter
+  gauge), so it curves, glows, flickers and gets split by cracks along with the visor.
+- Outside the mask, crisp and **deliberately unstyled**: a debug health bar (Godot's default
+  progress bar, showing %) and a filter readout. Remove these once the cracks read well in
+  playtests.
+
+### Mask audio (`Decided` for the prototype, sounds still tuning by ear)
+
+Half the gas mask illusion is sound. Everything is generated in code, so there are no audio files.
+
+- **Atmosphere first.** The room should feel present before anything happens:
+  - **Room tone:** a slow low rumble, a faint ventilation hum and duct air, looping seamlessly.
+  - **Distant events:** a creak, drip, far-off boom or vent rattle every 4–12 s, somewhere 7–18 m
+    around you. Atmosphere only, since enemies don't react to them.
+  - **Reverb:** a concrete-room echo on every world sound, heard *through* the mask, so the
+    echoes come through dull and distant too.
+  - **Balance:** calm breathing sits just under the room tone. Your body only takes over when
+    things go wrong (choking, heartbeat).
+- **You hear yourself breathe, and it matches the fog.** A warm, low "hoo" out through the exhale
+  valve, a breathier draw in through the filter, a faint rubber valve flap at each turn of breath,
+  and the boxy ring of air trapped in a mask. It shares one breathing rhythm with the visor, so
+  every fog puff lands on an exhale you hear.
+  - Faster and louder with effort, and stays heavy after a sprint.
+  - **Wheezes and whistles as the filter wears out**, so you can *hear* it running down.
+  - Ragged gasping when you're choking.
+- **Heartbeat** fades in below 50% health: a lub-dub that speeds up as you get closer to death.
+- **Fresh filter:** a click as it seats, then a rush of air (inside your mask), plus a hiss nearby
+  enemies can hear.
+- **The world is muffled by your mask**, and **cracks let sound in**: an intact mask muffles
+  heavily, a shattered one barely at all. Your health changes how the world sounds.
+- **World sounds:** flask shatters, crates crashing (louder the harder and heavier), filter
+  hiss, and the evil guy's growl when it spots you, a snarl on the windup (**you can hear a swing
+  coming**), the whoosh of the swing, and a wet splat when it dies.
+- **What you hear, it hears.** Every audible world sound is also a noise event at the same radius.
+  Other evil guys come to investigate a buddy's growl, which gives primitive pack behaviour.
+- `Idea`: hearing teammates breathe through their masks (proximity breathing); footstep sounds;
+  a flatline drone on death; muffling that changes with filter state; room reverb.
+
+### The filter (`Decided` for the prototype, numbers still tuning)
+
+The mask's filter runs out, and that's a core pressure mechanic.
+
+- A fresh filter lasts **180 s** of calm breathing. It drains at **0.6×** standing still and up
+  to **2.5×** sprinting flat out, so **sprinting burns air**.
+- **Spent filter = choking:** 4 damage every 0.5 s (so the cracks spread), vision closes in and
+  pulses red, and the fog goes thick.
+- **Spare filter canisters** are physical props. Carry them, throw one to a teammate, press
+  **[E]** on one (or while holding it) to screw it on. A fresh filter **hisses**, which the evil
+  guy can hear within 4 m.
+- The test level has 3 spares: near spawn, on the table, up on the platform.
+- `Idea`: swapping takes time (you're blind and vulnerable while the filter's off); contaminated
+  zones that drain filters faster; better and worse filter types; filters as sellable loot or
+  something bought between rounds.
 
 ### Entities / monsters (`Idea`)
 
@@ -148,11 +227,11 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
   | --- | --- |
   | Walking | 3 m |
   | **Sprinting** | **10 m** |
-  | Beaker shattering | 14 m |
+  | Flask shattering | 14 m |
   | Props crashing | 3–18 m (harder and heavier = louder) |
 
   A noise makes it come and investigate, and a close noise puts it on edge. So **sneaking means
-  walking**, and throwing a beaker is loud (useful as a distraction?).
+  walking**, and throwing a flask is loud (useful as a distraction?).
 - **Memory, not omniscience:** lose line of sight for 0.75 s and it stops tracking you. It heads
   to where it **last saw you, plus 1 s of where you were going**, looks around, checks a few spots
   nearby for up to 12 s, then gives up and calms down.
@@ -211,3 +290,5 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 - [ ] Death: timed respawn (prototype) vs. teammate revive vs. out for the round?
 - [ ] Other archetypes and their kits?
 - [ ] The evil guy's lore, and whether it can be researched
+- [ ] Filter tuning: is 180 s right? Should swapping take time? Where do spares come from in real levels?
+- [ ] Do the cracks read clearly enough to drop the debug health bar?

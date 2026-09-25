@@ -5,6 +5,10 @@ extends Node
 ##   godot --headless res://tests/smoke_test.tscn -- --role=host     (start first)
 ##   godot --headless res://tests/smoke_test.tscn -- --role=client
 ## Prints "SMOKE PASS" or "SMOKE FAIL: ..." lines and exits with 0 / 1.
+## Visual check (needs a real window, so no --headless): saves visor screenshots to --out.
+##   godot --resolution 1280x720 res://tests/smoke_test.tscn -- --role=capture --out=C:/some/folder
+## Listening check: renders every procedural sound to .wav in --out (and checks levels).
+##   godot --headless res://tests/smoke_test.tscn -- --role=audio --out=C:/some/folder
 
 const PORT := 17777
 const TIMEOUT := 90.0
@@ -16,9 +20,11 @@ const SCENES := [
 	"res://props/crate_large.tscn",
 	"res://props/specimen_jar.tscn",
 	"res://enemies/enemy.tscn",
-	"res://items/acid_beaker_projectile.tscn",
+	"res://items/acid_flask_projectile.tscn",
+	"res://props/filter_canister.tscn",
 	"res://ui/main_menu.tscn",
 	"res://ui/hud.tscn",
+	"res://ui/visor_hud.tscn",
 ]
 
 var _role := ""
@@ -37,6 +43,8 @@ func _ready() -> void:
 		"scenes": await _run_scenes()
 		"host": await _run_host()
 		"client": await _run_client()
+		"capture": await _run_capture()
+		"audio": _check_audio(_arg("out", OS.get_user_data_dir()), true)
 		_: _fail("unknown role '%s'" % _role)
 	_finish()
 
@@ -57,6 +65,8 @@ func _run_scenes() -> void:
 		node.queue_free()
 		await _frames(1)
 
+	_check_audio(OS.get_user_data_dir(), false)
+
 	# Offline, we're the host (peer 1), so the level should spawn us and simulate props.
 	var level := (load("res://levels/test_level.tscn") as PackedScene).instantiate()
 	add_child(level)
@@ -70,14 +80,16 @@ func _run_scenes() -> void:
 	if player != null:
 		await _run_offline_combat(level, player)
 		await _run_offline_ai(level, player)
+		await _run_offline_filter(level, player)
+		await _run_offline_liquid(level)
 	level.queue_free()
 
 
-# Acid beaker vs. evil guy, evil guy vs. player, death and respawn, all offline as the host.
+# Acid flask vs. evil guy, evil guy vs. player, death and respawn, all offline as the host.
 func _run_offline_combat(level: Node, player: Node3D) -> void:
-	var beaker = load("res://items/acid_beaker.tres")
-	_check(beaker != null and beaker.Cooldown == 15.0, "acid_beaker.tres didn't load as a 15 s throwable")
-	if not _check(player.Loadout.size() == 1, "player loadout should hold the acid beaker (size %d)" % player.Loadout.size()):
+	var flask = load("res://items/acid_flask.tres")
+	_check(flask != null and flask.Cooldown == 15.0, "acid_flask.tres didn't load as a 15 s throwable")
+	if not _check(player.Loadout.size() == 1, "player loadout should hold the acid flask (size %d)" % player.Loadout.size()):
 		return
 
 	var nav := level.get_node("Navigation") as NavigationRegion3D
@@ -91,20 +103,34 @@ func _run_offline_combat(level: Node, player: Node3D) -> void:
 	var player_health := player.get_node("Health")
 
 	# Throw: freeze the AI, then throw from the hardest spot, bodies touching (0.8 m between centres).
-	# The beaker used to launch 0.4 m ahead of the eyes, i.e. inside the enemy, and fly straight through.
+	# The flask used to launch 0.4 m ahead of the eyes, i.e. inside the enemy, and fly straight through.
 	enemy.set_physics_process(false)
 	player.global_position = enemy.global_position + Vector3(0, 0, 0.8)
 	await _frames(2)
 	var eye: Vector3 = player.get_node("Head").global_position
 	var aim: Vector3 = (enemy.global_position + Vector3.UP * 1.2 - eye).normalized()
 	player.rpc_id(1, "RequestThrowItem", 1, eye, aim)
-	_check(await _wait_until(func(): return enemy_health.Current < enemy_health.MaxHealth, 3.0), "offline: acid beaker didn't hurt the evil guy")
+	_check(await _wait_until(func(): return enemy_health.Current < enemy_health.MaxHealth, 3.0), "offline: acid flask didn't hurt the evil guy")
+	var speakers := level.get_node("Effects").get_children().filter(func(n): return n is AudioStreamPlayer3D)
+	_check(not speakers.is_empty() and speakers[0].bus == &"World", "audio: the flask shattering made no (muffled) world sound")
 	var after_hit: float = enemy_health.Current
-	_log("beaker hit: evil guy at %.0f / %.0f" % [after_hit, enemy_health.MaxHealth])
+	_log("flask hit: evil guy at %.0f / %.0f" % [after_hit, enemy_health.MaxHealth])
 
 	player.rpc_id(1, "RequestThrowItem", 1, eye, aim) # still recharging, so the host must refuse
 	await _seconds(1.0)
-	_check(enemy_health.Current == after_hit, "offline: beaker ignored its 15 s recharge")
+	_check(enemy_health.Current == after_hit, "offline: flask ignored its 15 s recharge")
+
+	# The flask in hand empties when thrown, then its acid refills over the recharge.
+	var hand_liquid := player.get_node("Head/Camera3D/HandItem").find_child("Liquid", true, false)
+	player.SelectedSlot = 1
+	await _frames(2)
+	var full_fill: float = hand_liquid.Fill
+	player.UseSelectedItem() # the host refuses it (still recharging), but our own flask empties
+	await _frames(2)
+	_check(full_fill > 0.5 and hand_liquid.Fill < 0.02, "offline: thrown flask didn't empty in hand (%.2f -> %.2f)" % [full_fill, hand_liquid.Fill])
+	await _seconds(1.5)
+	_check(hand_liquid.Fill > 0.03 and hand_liquid.Fill < 0.15, "offline: flask in hand isn't refilling with the recharge (%.2f)" % hand_liquid.Fill)
+	player.SelectedSlot = 0
 
 	# Let it loose next to us: it should swing and hurt us.
 	enemy.set_physics_process(true)
@@ -230,6 +256,71 @@ func _run_offline_ai(level: Node, player: Node3D) -> void:
 	_log("AI v2: vision, memory, search, hearing, drop links (%d), shoving all behave" % links.size())
 
 
+# Audio: the buses exist (the World bus muffles through the mask), and every procedural sound renders
+# at a sane level: audible, not clipping. The .wavs land in `out` for listening.
+func _check_audio(out: String, verbose: bool) -> void:
+	var world := AudioServer.get_bus_index("World")
+	_check(world >= 0 and AudioServer.get_bus_index("Mask") >= 0, "audio: World / Mask buses missing (default_bus_layout.tres)")
+	_check(world >= 0 and AudioServer.get_bus_effect_count(world) > 0 and AudioServer.get_bus_effect(world, 0) is AudioEffectLowPassFilter, "audio: the World bus has no mask muffle")
+
+	var levels: Dictionary = load("res://audio/AudioPreview.cs").new().Render(out)
+	for sound in levels:
+		var level: Vector2 = levels[sound]
+		if verbose:
+			_log("%-18s peak %.2f  rms %.3f" % [sound, level.x, level.y])
+		_check(level.x < 0.99, "audio: %s clips (peak %.2f)" % [sound, level.x])
+		_check(level.y > 0.01, "audio: %s is near silent (rms %.3f)" % [sound, level.y])
+	if verbose:
+		_log("wrote %d .wav files to %s" % [levels.size(), out])
+
+
+# Gas mask filter: drains, chokes you when spent, a spare refills it (once), respawning gives a fresh one.
+func _run_offline_filter(level: Node, player: Node3D) -> void:
+	level.EnemyRespawnDelay = 999.0 # keep the evil guy out of this one
+	for enemy in level.get_node("Enemies").get_children():
+		enemy.get_node("Health").TakeDamage(99999.0, 0)
+	var health := player.get_node("Health")
+	var respirator := player.get_node("Respirator")
+	health.MaxHealth = 100.0
+	health.Revive()
+	respirator.Refill()
+
+	var start: float = respirator.Remaining
+	await _seconds(0.5)
+	_check(respirator.Remaining < start, "filter: didn't drain while breathing")
+
+	respirator.Remaining = 0.0
+	var before: float = health.Current
+	_check(await _wait_until(func(): return health.Current < before, 2.0), "filter: a spent filter didn't make the player choke")
+
+	var canister := level.get_node("Props/FilterA") as RigidBody3D
+	player.global_position = canister.global_position + Vector3(0, 0, 1.2)
+	await _frames(2)
+	canister.rpc_id(1, "RequestUse")
+	await _frames(2)
+	_check(respirator.Remaining > respirator.Capacity - 1.0, "filter: screwing on a spare didn't refill it")
+	_check(canister.Consumed and not canister.visible and canister.collision_layer == 0, "filter: the used canister is still there")
+	respirator.Remaining = 10.0
+	canister.rpc_id(1, "RequestUse")
+	await _frames(2)
+	_check(respirator.Remaining < 11.0, "filter: a used-up canister refilled the filter again")
+
+	player.RespawnDelay = 0.3
+	health.TakeDamage(9999.0, 0)
+	var fresh := await _wait_until(func(): return health.Current > 0.0 and respirator.Remaining > respirator.Capacity - 1.0, 3.0)
+	_check(fresh, "filter: respawning didn't come with a fresh filter")
+
+
+# Liquid: a shoved flask sloshes, then settles back to level.
+func _run_offline_liquid(level: Node) -> void:
+	var flask := level.get_node("Props/FlaskB") as RigidBody3D
+	var liquid := flask.find_child("Liquid", true, false)
+	await _frames(5)
+	flask.apply_central_impulse(Vector3(1.2, 0.8, 0))
+	_check(await _wait_until(func(): return liquid.Slosh() > 0.05, 1.0), "liquid: didn't slosh when its flask was shoved")
+	_check(await _wait_until(func(): return liquid.Slosh() < 0.01, 6.0), "liquid: never settled back to level")
+
+
 # Kills whatever's there and waits for the level to spawn a fresh, calm evil guy.
 func _fresh_enemy(level: Node) -> Node3D:
 	var enemies := level.get_node("Enemies")
@@ -246,8 +337,13 @@ func _run_host() -> void:
 	_start_main()
 	if not _check(_network.Host(PORT) == OK, "host: couldn't open port %d" % PORT):
 		return
-	if not _check(await _wait_until(func(): return _level() != null, 5.0), "host: level never loaded"):
+	if not _check(await _wait_until(func(): return _players() != null and _players().has_node("1"), 5.0), "host: level never loaded"):
 		return
+	# Take the host's own (idle) player out of play, so the evil guy can only lock on to the client
+	# the network checks are about. Otherwise it sometimes spots the host first and ignores the client.
+	var own := _players().get_node("1")
+	own.RespawnDelay = 999.0
+	own.get_node("Health").TakeDamage(99999.0, 0)
 	_log("hosting, waiting for a client")
 
 	if not _check(await _wait_until(func(): return not multiplayer.get_peers().is_empty(), 30.0), "host: no client connected"):
@@ -302,11 +398,124 @@ func _run_client() -> void:
 	_check(jar.global_position.z < before.z - 1.0, "client: jar didn't fly forward (z %.2f -> %.2f)" % [before.z, jar.global_position.z])
 	_log("threw jar: %s -> %s" % [before, jar.global_position])
 
+	await _run_network_filter(me)
 	await _run_network_combat(me, head)
 
 	_network.Leave()
 	await _frames(5)
 	_check(_level() == null, "client: level not cleared after leaving")
+
+
+# The host breathes for us (drains our filter) and replicates it; a spare canister refills it.
+func _run_network_filter(me: Node3D) -> void:
+	var respirator := me.get_node("Respirator")
+	var capacity: float = respirator.Capacity
+	_check(await _wait_until(func(): return respirator.Remaining < capacity, 3.0), "client: filter never drained (host breathing not replicating?)")
+
+	var canister := _level().get_node("Props/FilterB") as Node3D # on the table
+	me.global_position = Vector3(canister.global_position.x, 0.05, -4.5) # beside the table
+	await _seconds(0.3) # let the host see us next to it
+	canister.rpc_id(1, "RequestUse")
+	var refilled := await _wait_until(func(): return canister.Consumed and respirator.Remaining > capacity - 1.0, 2.0)
+	_check(refilled, "client: a spare filter didn't refill us and vanish (remaining %.1f, consumed %s)" % [respirator.Remaining, canister.Consumed])
+	_log("filter: drained to <%d s, spare canister refilled it" % capacity)
+
+
+# Visual + level check (needs a real window and sound): host a session, save screenshots of the visor
+# healthy, hurt, and choking on a spent filter, and log the live bus meters through each phase: the
+# in-mask sound (Mask bus) vs. the world (World bus: muffled, with reverb and ambience).
+# (Not a recording: Godot's recorder only captures one channel pair on surround setups.)
+func _run_capture() -> void:
+	var out := _arg("out", OS.get_user_data_dir())
+	_start_main()
+	if not _check(_network.Host(PORT + 1) == OK, "capture: couldn't host"):
+		return
+	if not _check(await _wait_until(func(): return _players() != null and _players().has_node("1"), 5.0), "capture: level never loaded"):
+		return
+	await _frames(5)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE # don't hold on to the mouse while capturing
+
+	var player := _players().get_node("1") as Node3D
+	var enemy := _level().get_node("Enemies").get_child(0) as Node3D
+	enemy.set_physics_process(false) # pose it in view
+	enemy.global_position = player.global_position + Vector3(1.2, 0, -5)
+	enemy.rotation = Vector3(0, PI, 0)
+	var health := player.get_node("Health")
+	var ambience := _level().get_node("Ambience")
+	const SHATTER := 0 # SoundKind order in audio/SoundBank.cs
+	const GROWL := 3
+
+	# Cel shading before / after, same moment.
+	var toon := _main.get_node("ToonStyle")
+	toon.Enabled = false
+	await _seconds(0.3)
+	await _screenshot(out.path_join("toon_off.png"))
+	toon.Enabled = true
+	await _seconds(0.3)
+	await _screenshot(out.path_join("toon_on.png"))
+
+	# Liquid close-up: stand at the table's end facing the flask, zoom in, then shove it sideways and
+	# catch it mid-slosh.
+	var start := player.global_transform
+	var head := player.get_node("Head") as Node3D
+	var camera := head.get_node("Camera3D") as Camera3D
+	var flask := _level().get_node("Props/FlaskA") as RigidBody3D
+	player.global_position = Vector3(4.35, 0.05, flask.global_position.z)
+	player.rotation = Vector3(0, -PI / 2.0, 0) # facing +x, along the table
+	head.rotation = Vector3(-0.5, 0, 0)
+	camera.fov = 40.0
+	await _seconds(0.6)
+	await _screenshot(out.path_join("liquid_still.png"))
+	flask.apply_central_impulse(Vector3(0, 0, 0.3))
+	await _seconds(0.18)
+	await _screenshot(out.path_join("liquid_slosh.png"))
+	camera.fov = 80.0
+	player.global_transform = start
+	head.rotation = Vector3.ZERO
+
+	# The acid flask in hand: full, then refilling a third of the way through its recharge.
+	player.SelectedSlot = 1
+	await _seconds(0.5)
+	await _screenshot(out.path_join("hand_full.png"))
+	player.UseSelectedItem()
+	await _seconds(5.0)
+	await _screenshot(out.path_join("hand_refilling.png"))
+	player.SelectedSlot = 0
+
+	await _meter("calm: breathing + room tone", 1.5)
+	await _screenshot(out.path_join("visor_1_healthy.png"))
+	ambience.PlayDistantEvent()
+	await _meter("a distant ambience event", 1.5)
+	_level().EmitSound(player.global_position + Vector3(2, 1, -3), 14.0, SHATTER)
+	_level().EmitSound(enemy.global_position + Vector3.UP * 2.0, 12.0, GROWL)
+	await _meter("shatter + growl nearby", 1.5)
+	health.TakeDamage(45.0, 0) # cracks: the mask muffles less from here
+	await _meter("hurt (cracked mask)", 0.6)
+	await _screenshot(out.path_join("visor_2_hurt.png"))
+	health.TakeDamage(35.0, 0)
+	player.get_node("Respirator").Remaining = 0.0
+	await _meter("choking + heartbeat", 1.2)
+	await _screenshot(out.path_join("visor_3_choking.png"))
+	_network.Leave()
+
+
+# Loudest peak (dB, across all channels) on each bus over a stretch of real playback.
+func _meter(label: String, seconds: float) -> void:
+	var loudest := {"Master": -200.0, "World": -200.0, "Mask": -200.0}
+	var until := Time.get_ticks_msec() + int(seconds * 1000)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		for bus_name in loudest:
+			var bus := AudioServer.get_bus_index(bus_name)
+			for ch in AudioServer.get_bus_channels(bus):
+				loudest[bus_name] = max(loudest[bus_name], AudioServer.get_bus_peak_volume_left_db(bus, ch), AudioServer.get_bus_peak_volume_right_db(bus, ch))
+	_log("%-30s Mask %6.1f dB   World %6.1f dB   Master %6.1f dB" % [label, loudest["Mask"], loudest["World"], loudest["Master"]])
+
+
+func _screenshot(path: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png(path)
+	_log("saved " + path)
 
 
 # The host runs the evil guy and all damage. The client gets hit, then hits back.
@@ -334,8 +543,8 @@ func _run_network_combat(me: Node3D, head: Node3D) -> void:
 	var start_health: float = enemy_health.Current
 	var eye := head.global_position
 	me.rpc_id(1, "RequestThrowItem", 1, eye, (enemy.global_position + Vector3.UP * 1.2 - eye).normalized())
-	_check(await _wait_until(func(): return enemy_health.Current < start_health, 2.0), "client: point-blank acid beaker didn't hurt the evil guy")
-	_log("beaker hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
+	_check(await _wait_until(func(): return enemy_health.Current < start_health, 2.0), "client: point-blank acid flask didn't hurt the evil guy")
+	_log("flask hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
 
 
 func _start_main() -> void:

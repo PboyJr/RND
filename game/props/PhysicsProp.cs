@@ -1,4 +1,5 @@
 using Godot;
+using RND.Audio;
 using RND.Core;
 using RND.Levels;
 using RND.Players;
@@ -93,7 +94,7 @@ public partial class PhysicsProp : RigidBody3D
 			return;
 
 		_noiseCooldown = 0.3f;
-		Level.Current?.EmitNoise(GlobalPosition, Mathf.Clamp(lost * 2f * Mathf.Sqrt(Mass / 4f), 3f, 18f));
+		Level.Current?.EmitSound(GlobalPosition, Mathf.Clamp(lost * 2f * Mathf.Sqrt(Mass / 4f), 3f, 18f), SoundKind.Impact);
 	}
 
 	public override void _IntegrateForces(PhysicsDirectBodyState3D state)

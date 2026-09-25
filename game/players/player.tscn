@@ -3,7 +3,10 @@
 [ext_resource type="Script" path="res://players/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://combat/Health.cs" id="2_health"]
 [ext_resource type="Script" path="res://items/HotbarItem.cs" id="3_hotbar_item"]
-[ext_resource type="Resource" path="res://items/acid_beaker.tres" id="4_acid_beaker"]
+[ext_resource type="Resource" path="res://items/acid_flask.tres" id="4_acid_flask"]
+[ext_resource type="Script" path="res://combat/Respirator.cs" id="5_respirator"]
+[ext_resource type="Script" path="res://players/Breathing.cs" id="6_breathing"]
+[ext_resource type="PackedScene" path="res://models/erlenmeyer_flask.tscn" id="7_flask"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.35
@@ -22,22 +25,6 @@ roughness = 0.2
 material = SubResource("StandardMaterial3D_visor")
 size = Vector3(0.45, 0.14, 0.12)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hand_item"]
-transparency = 1
-albedo_color = Color(0.5, 1, 0.4, 0.75)
-roughness = 0.1
-emission_enabled = true
-emission = Color(0.35, 1, 0.3, 1)
-emission_energy_multiplier = 0.8
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_hand_item"]
-material = SubResource("StandardMaterial3D_hand_item")
-top_radius = 0.05
-bottom_radius = 0.06
-height = 0.16
-radial_segments = 12
-rings = 1
-
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_player"]
 properties/0/path = NodePath(".:SyncPosition")
 properties/0/spawn = false
@@ -54,7 +41,7 @@ properties/3/replication_mode = 2
 properties/4/path = NodePath(".:SelectedSlot")
 properties/4/spawn = false
 properties/4/replication_mode = 2
-properties/5/path = NodePath(".:SelectedItemReady")
+properties/5/path = NodePath(".:SelectedItemCharge")
 properties/5/spawn = false
 properties/5/replication_mode = 2
 
@@ -63,11 +50,16 @@ properties/0/path = NodePath(".:Current")
 properties/0/spawn = true
 properties/0/replication_mode = 2
 
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_respirator"]
+properties/0/path = NodePath(".:Remaining")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
 collision_mask = 15
 script = ExtResource("1_player")
-Loadout = Array[ExtResource("3_hotbar_item")]([ExtResource("4_acid_beaker")])
+Loadout = Array[ExtResource("3_hotbar_item")]([ExtResource("4_acid_flask")])
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
@@ -92,11 +84,9 @@ near = 0.05
 target_position = Vector3(0, 0, -2.5)
 collision_mask = 13
 
-[node name="HandItem" type="MeshInstance3D" parent="Head/Camera3D"]
+[node name="HandItem" parent="Head/Camera3D" instance=ExtResource("7_flask")]
 visible = false
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, -0.24, -0.5)
-cast_shadow = 0
-mesh = SubResource("CylinderMesh_hand_item")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.24, -0.27, -0.5)
 
 [node name="NameLabel" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.15, 0)
@@ -110,6 +100,16 @@ script = ExtResource("2_health")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Health"]
 replication_config = SubResource("SceneReplicationConfig_health")
+
+[node name="Respirator" type="Node" parent="."]
+script = ExtResource("5_respirator")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Respirator"]
+replication_interval = 0.25
+replication_config = SubResource("SceneReplicationConfig_respirator")
+
+[node name="Breathing" type="Node" parent="."]
+script = ExtResource("6_breathing")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_player")

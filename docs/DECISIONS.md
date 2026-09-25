@@ -96,7 +96,7 @@ the level spawned by the host avoids that race.
 - **Our own backend:** probably needed eventually, for (a) persistent characters that can't be
   edited locally (the decay system) and (b) relaying phone players, who can't use Steam.
 
-## 2026-09-24: Look: grain post-process layer
+## 2026-09-24: Look: grain post-process layer (*Superseded* by "Gas mask visor" below)
 
 **Decision:** a full-screen `ColorRect` with a screen-reading canvas shader on its own CanvasLayer
 (`Main/PostFX`, layer 1), drawn between the 3D view and the UI (`Main/UI`, layer 2).
@@ -165,7 +165,7 @@ deals damage, triggers the splash effect for everyone (`Effects.Splash` RPC) and
 
 **Why:** no per-frame position syncing for projectiles, and damage stays host-authoritative.
 
-**Trade-off:** the thrower sees their own beaker appear after a round trip (not noticeable on a
+**Trade-off:** the thrower sees their own flask appear after a round trip (not noticeable on a
 LAN). Client-side prediction can come later if it feels laggy over the internet.
 
 ## 2026-09-24: Enemies are host-authoritative, spawned, with a runtime navmesh
@@ -229,7 +229,7 @@ projectile's hit mask, so launching from inside the thrower is safe.
   Anything that makes sound should call it:
   - **Footsteps:** worked out on the host from how far each player actually moved (so remote
     players need no extra RPC, and a blocked player is silent). Teleports (> 20 m/s) are ignored.
-  - **Beaker shatter:** `SplashProjectile.ShatterNoiseRadius`.
+  - **Flask shatter:** `SplashProjectile.ShatterNoiseRadius`.
   - **Prop crashes:** a sudden *loss* of speed (being thrown or carried is silent).
 - **Mood is replicated** (`Enemy.Mood`: Calm / Suspicious / Hunting) purely so every client can
   show it in the eyes. Readable AI is fair AI.
@@ -251,6 +251,143 @@ projectile's hit mask, so launching from inside the thrower is safe.
 sees in front; searches the last seen spot, not the true one; gives up; ignores far noise and
 investigates loud noise; can't hear walking but can hear sprinting; drops off the platform; shoves
 a crate. They pass 5/5 offline and 5/5 over the network.
+
+## 2026-09-24: Gas mask visor: one post pass, HUD projected through it
+
+**Decision:**
+- **One full-screen shader does everything** (`vfx/visor.gdshader` on `Main/PostFX/Visor`): the
+  visor (rim shape, curved glass, blur and fringing at the edge, fog, cracks, choke, hit flash)
+  and then the old grain / colour crush, folded in. One screen read means no back-buffer ordering
+  problems. The old `grain.gdshader` is gone.
+- **`vfx/Visor.cs` drives it** from `Player.Local`: cracks = 1 − health fraction (spreading
+  quickly, snapping clean on respawn), fog from exertion (breath rate and a slow recovery) plus
+  filter wear, choke from a spent filter, sway from look speed, flash on health drops. No local
+  player (menus) means `visor_enabled = 0`, i.e. just the camera grain.
+- **Projected HUD:** `ui/visor_hud.tscn` renders in a `SubViewport` (`Main/HudViewport`,
+  transparent, sized to the screen by `Visor`). The shader samples it through the same glass
+  distortion, sway and shard offsets, with glow and flicker, so the HUD sits *on* the glass.
+- **Crisp overlay stays outside the mask** (`ui/hud.tscn` on `Main/UI`): pause menu, death text,
+  status, and the unstyled debug health / filter readout.
+- **Cracks are procedural:** 8 fixed impact points with damage thresholds; each is a star of
+  straight, kinked spokes (piecewise-linear noise) plus polygonal ring fragments. No textures.
+
+**How we verified it:** `smoke_test` has a `capture` role that runs *windowed* (the headless
+renderer can't draw shaders) and saves screenshots of the visor healthy, hurt and choking. The
+first pass showed wavy "spider web" cracks, which were fixed to straight fractures from the
+screenshots.
+
+## 2026-09-24: Gas mask filter is host-owned, like health
+
+**Decision:**
+- `combat/Respirator.cs` is a child of the player (authority = host, like `Health`), replicated
+  at 4 Hz (`replication_interval = 0.25`, since it changes constantly).
+- The host drains it from the **same measured speed as footsteps**, so remote players need no
+  extra RPC. When it's spent it deals damage in gasps (not per frame, which would spam hit
+  effects).
+- `props/FilterCanister.cs` is a `PhysicsProp` subclass: carry and throw work unchanged, plus a
+  `RequestUse` RPC. Canisters are placed in the level (not spawned), so a used one can't be
+  freed on clients. Instead a replicated `Consumed` flag hides it and turns off its collision
+  everywhere.
+
+## 2026-09-24: Audio is procedural, and "sound" and "noise" share one event
+
+**Decision:**
+- **No audio files.** `audio/SoundBank.cs` synthesises world one-shots (one per kind, cached as
+  `AudioStreamWav` on first use, with the same seed as the previews, so what you audition is
+  exactly what plays; `Effects.PlaySound` varies the pitch so repeats differ). `audio/MaskSynth.cs` synthesises the in-mask
+  sound sample by sample into an `AudioStreamGenerator` (`audio/MaskAudio.cs`). Both are plain
+  code "recipes" meant to be tuned by ear.
+- **Buses** (`default_bus_layout.tres`):
+  - **World** has a low-pass, the mask muffle. `MaskAudio` drives its cutoff from visor damage:
+    1100 Hz intact up to 7000 Hz shattered, and 20 kHz with no mask (menus).
+  - **Mask** is clean: breathing, heartbeat, fresh-filter hiss.
+- **`Level.EmitSound(position, radius, kind)`** is the host-side call for anything audible: it
+  calls `EmitNoise` (enemies hear it) *and* broadcasts `Effects.PlaySound` (players hear it,
+  positionally, on the World bus) at the same radius. `EmitNoise` alone is for silent AI-only
+  noise (footsteps, for now).
+- **One breathing clock.** `players/Breathing.cs` (local player only) owns exertion, choke,
+  rate and phase. The visor's fog and `MaskSynth`'s breathing both read it, so they can't drift
+  apart. It replaced the visor's private copy.
+- The in-mask mix goes through a **tanh soft limiter**, so overlapping sounds squash instead of
+  clipping.
+
+**Atmosphere pass (after "breathing way too loud, sounds superficial"):**
+- World bus: low-pass (mask) **then reverb** (concrete room: room size 0.75, 35% wet, 40 ms
+  predelay), so echoes are muffled too.
+- `audio/Ambience.cs` (in each level, local to each player): a looping room tone plus random
+  distant events placed around the listener. Atmosphere only, so it's not an `EmitSound`.
+- Recipes moved from pure sine tones to **resonating noise** (`Resonator`, a two-pole resonator
+  that's stable up to Nyquist, and `Layered`, which mixes per-layer-normalised parts), so things
+  sound like objects rather than synths.
+- Breathing about −14 dB from the first version: softer noise, two-band valve "voice", a comb-filter
+  mask-cavity resonance, and rubber valve flaps. At calm it now sits just under the room tone.
+
+**How we verified it:** Claude can't listen, so there's an objective check instead. The smoke
+test's `audio` role (and the offline suite) renders every sound to `.wav` and fails on clipping
+(peak ≥ 0.99) or near-silence (RMS ≤ 0.01). It caught the heartbeat and fresh-filter hiss
+clipping on the first run. The windowed `capture` role runs it all on the real audio driver and
+logs the **live bus meters** (Mask vs. World vs. Master) through calm, distant event, nearby
+shatter + growl, hurt, and choking. That's how the mix balance is checked.
+**Tuning is by ear:** render with `--role=audio --out=<folder>` and listen, or just play.
+
+**Gotcha:** don't verify the mix with `AudioEffectRecord` on surround setups. On a 7.1 device
+(like the main dev machine) it only records one channel pair (not the front), so non-positional
+sounds (room tone, breathing) look silent in the recording even though they play fine. Use the bus
+meters instead.
+
+## 2026-09-24: Cel shading is applied at runtime over ordinary materials
+
+**Decision (prototype):**
+- `vfx/ToonStyle.cs` (on `Main`, **F2 toggles**) swaps every opaque, lit `StandardMaterial3D` in
+  the scene (existing nodes, and new ones as they're added) for a `ShaderMaterial` using
+  `vfx/toon.gdshader`. Each toon copy's albedo and emission are **copied from the original every
+  frame**, so code that animates materials (hit flashes, the evil guy's mood eyes) keeps working
+  untouched. Turning it off restores the originals. Transparent and unshaded materials (glass,
+  effects, liquids) are skipped.
+- Lighting bands come from `vfx/toon_ramp.tres` (a constant-interpolation gradient: light level in,
+  brightness out), editable in the inspector. The thresholds are tuned for our dim, fast-falloff
+  lamps (0.05 / 0.25). The first try (0.22 / 0.6) turned most walls black.
+- Outlines are a screen-space pass (`vfx/outline.gdshader`) on a full-screen quad parented to the
+  active camera: depth and normal discontinuities, fading with distance. It reads the normal
+  buffer, so it's **Forward+ only** (fine for PC; phones would need another approach).
+
+**Why:** artists keep authoring ordinary materials, the style is switchable for comparison, and it
+covers grey-box, props, characters and effects with no per-asset work.
+
+## 2026-09-24: Liquids: world-space cut plane plus local slosh
+
+**Decision:** `vfx/liquid.gdshader` discards everything above a world-space surface plane and draws
+the back faces below it as the flat surface (plus a meniscus band). `vfx/Liquid.cs` (on the
+`Liquid` mesh) puts the plane at `Fill` of the mesh's current world-space height range (so tipping
+pours it to the low side) and tilts it with a damped spring driven by changes in the vessel's
+velocity. It's purely visual and computed on every peer from how the prop moves, so there's no
+networking. The model just needs a closed `Liquid` mesh filling the vessel (see ART.md).
+
+## 2026-09-24: The acid item is the Erlenmeyer flask, and its recharge shows in the liquid
+
+**Decision:**
+- One model scene, `models/erlenmeyer_flask.tscn` (glass + `Liquid`), is instanced by the flask
+  prop, the flask in your hand (`HandItem` in `players/player.tscn`) and the thrown flask
+  (`items/acid_flask_projectile.tscn`). Swapping in the real model there updates all three.
+- The player syncs **`SelectedItemCharge`** (0 = just thrown, 1 = ready) instead of the old
+  `SelectedItemReady` bool, and the hand flask's `Fill` is its full fill × charge. So everyone,
+  not just the thrower, sees it empty and refill. It costs one float per player while recharging.
+- The hand item is always the flask, since it's the only item. When an item that isn't a flask
+  arrives, give `HotbarItem` a hand-model scene.
+- `Liquid.cs`: a shallow liquid's slosh is capped by its depth, so a nearly empty flask doesn't
+  slosh a wedge of liquid up the side from nowhere. `Fill` 0 hides it.
+
+**Why:** the user's call: the cooldown shows on the object, not only on the hotbar.
+
+## 2026-09-24: Outlines are one-sided (1 px), with width in the Inspector
+
+**Decision:** `vfx/outline.gdshader` only counts depth / normal jumps towards neighbours that are
+farther away, so only the nearer side of each edge draws the line. Lines are `thickness` pixels
+wide (default 1). Before this, both sides drew it, so lines were 2 px even at the lowest setting.
+The outline material lives on `Main/ToonStyle` (**Outline Material** in the Inspector): width,
+colour, sensitivity and fade distance are its shader parameters.
+
+**Why:** the user wanted thinner lines.
 
 ---
 
@@ -281,6 +418,20 @@ Things the prototype does on purpose that we'll need to revisit:
   though stuck recovery stops it wedging forever.
 - The navmesh has walkable islands on the tabletop (unreachable, harmless) and gets drop links off
   it.
+- `ToonStyle` keeps a toon copy of every material it has ever seen (a few per enemy respawn) and
+  syncs them all every frame. Fine for a prototype; prune it if cel shading is adopted.
+- The liquid slosh only reacts to linear motion (sliding, throwing, stopping), not to spinning.
+- Outline width is in screen pixels, so lines look thinner at higher resolutions. Scale
+  `thickness` by resolution if that matters on 1440p / 4K screens.
+- The sounds are synthesised placeholders tuned by numbers, not by ear. Expect to retune them,
+  or swap in recorded sounds later (keep the `SoundKind` / `EmitSound` API).
+- Footsteps make AI noise but no sound yet, and you can't hear teammates breathe.
+- World sound RPCs are sent reliably, one per event. Fine for now; batch or throttle them if prop
+  chaos ever floods the network.
+- Visor effects can't be tested headless. Use the `capture` role (windowed) and look at the
+  screenshots.
+- The projected HUD's layout assumes the visor shape (it avoids the nose cup at the bottom
+  centre). If the visor shape changes, re-check `ui/visor_hud.tscn` anchors.
 - Noise carries no source, only a position and a radius. Hearing a crash sends it to the crash,
   not to whoever threw the crate. Add a source back if AI ever needs to tell noises apart.
-- The thrower's own beaker appears after a network round trip (no client-side prediction).
+- The thrower's own flask appears after a network round trip (no client-side prediction).

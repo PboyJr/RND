@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-24 (after M2)
+Last updated: 2026-09-24 (after M6: acid flask, thinner outlines)
 
 ---
 
@@ -50,6 +50,44 @@ Goal: the evil guy acts on what it perceives, not what the code knows.
 - [x] Shoves props out of its way; sidesteps and re-plans when wedged
 - [x] Smoke checks for every behaviour above
 
+### M4: Gas mask HUD + filter ✅ (2026-09-24)
+
+Goal: you're wearing a gas mask, and it matters.
+
+- [x] Panoramic visor shader: rim, curved glass, edge blur and fringe, breath fog, sway, hit flash
+- [x] Cracks are the health bar (procedural shattered glass, clean on respawn)
+- [x] HUD projected onto the glass (hotbar, hints, crosshair, filter gauge)
+- [x] Unstyled debug health / filter readout outside the mask
+- [x] Filter mechanic: drains with effort, choke damage when spent, spare canisters ([E]) that
+      can be carried and thrown, and whose hiss enemies hear
+- [x] Smoke checks (offline + network) plus a windowed `capture` role for visual checks
+
+### M5: Mask audio ✅ (2026-09-24)
+
+Goal: sound sells the mask as much as the visor does.
+
+- [x] Procedural breathing (valve exhale, filter inhale), synced to the visor fog via one breathing
+      clock; louder with effort, wheezing as the filter wears, gasping when choking
+- [x] Heartbeat below 50% health; fresh-filter click and hiss
+- [x] World muffled through the mask, less so the more it's cracked (bus low-pass)
+- [x] World sounds: shatter, impacts, hiss, evil guy growl / snarl / swipe / splat
+- [x] `EmitSound`: one event for players and AI (buddies investigate each other's growls)
+- [x] `audio` smoke role: renders every sound to .wav and checks for clipping and silence
+- [x] Atmosphere pass: room reverb, looping room tone, distant ambience events, more natural
+      (resonating-noise) recipes, breathing about 14 dB quieter and more human; mix balance
+      checked with live bus meters
+
+### M6: Look dev ✅ (2026-09-24)
+
+- [x] Cel shading prototype: toon ramp lighting + screen-space outlines over all materials, F2 to
+      compare (tuned so the dim room stays readable)
+- [x] Liquid shader + slosh: level-in-the-world surface, sloshes and settles, fill and glow
+- [x] Placeholder Erlenmeyer flask prop, ready for the real model (steps in ART.md)
+- [x] Capture shots: toon off / on, liquid still / mid-slosh; smoke check that liquid sloshes and settles
+- [x] Acid beaker → **acid flask**: the Erlenmeyer flask in your hand (and thrown), its acid
+      refilling over the 15 s recharge, visible to everyone; one shared flask model scene
+- [x] Thinner outlines (1 px instead of 2), width / colour adjustable in the Inspector
+
 ---
 
 ## Next: pick one
@@ -57,7 +95,7 @@ Goal: the evil guy acts on what it perceives, not what the code knows.
 | Option | What it proves | Notes |
 | --- | --- | --- |
 | **Valuables + round loop** ⭐ recommended | It's a *game*, not a tech demo | Props with value and fragility (damage costs money), sell / extraction point, round timer, end-of-round payout. Works entirely on the current LAN setup. Now there's a threat to survive while doing it. |
-| **Combat polish** | Fighting feels good | Acid puddles, beaker prediction for the thrower, enemy reacts to thrown props, better death (revive?), sounds. |
+| **Combat polish** | Fighting feels good | Acid puddles, flask prediction for the thrower, enemy reacts to thrown props, better death (revive?), sounds. |
 | **Steam lobbies + relay** | Friends can play over the internet | Choose Facepunch.Steamworks or GodotSteam. Swap goes in `core/Network.cs`. Needed before any remote playtest. |
 | **Proximity voice** | The REPO social magic | Easiest after Steam (Steam Voice). |
 
@@ -67,6 +105,9 @@ Goal: the evil guy acts on what it perceives, not what the code knows.
 
 Rough order, and likely to change:
 
+- **Audio v2:** footstep sounds, hearing teammates breathe, room reverb, tuning (or recorded
+  replacements) after playtests
+- **Filter depth:** timed swaps, contaminated zones, filter types (see DESIGN)
 - **Enemy AI v3:** learns your habits, reacts to light, crouch-sneaking, several enemies sharing
   what they notice, lure-with-noise play (see DESIGN)
 - **More archetypes + kits** (the hotbar and item system are ready for them)

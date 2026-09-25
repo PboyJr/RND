@@ -2,12 +2,22 @@
 
 [ext_resource type="Script" path="res://core/Main.cs" id="1_main"]
 [ext_resource type="PackedScene" path="res://levels/test_level.tscn" id="2_level"]
-[ext_resource type="Shader" path="res://vfx/grain.gdshader" id="3_grain"]
-[ext_resource type="PackedScene" path="res://ui/hud.tscn" id="4_hud"]
-[ext_resource type="PackedScene" path="res://ui/main_menu.tscn" id="5_menu"]
+[ext_resource type="Shader" path="res://vfx/visor.gdshader" id="3_visor_shader"]
+[ext_resource type="Script" path="res://vfx/Visor.cs" id="4_visor"]
+[ext_resource type="PackedScene" path="res://ui/visor_hud.tscn" id="5_visor_hud"]
+[ext_resource type="PackedScene" path="res://ui/hud.tscn" id="6_hud"]
+[ext_resource type="PackedScene" path="res://ui/main_menu.tscn" id="7_menu"]
+[ext_resource type="Script" path="res://audio/MaskAudio.cs" id="8_mask_audio"]
+[ext_resource type="Script" path="res://vfx/ToonStyle.cs" id="9_toon_style"]
+[ext_resource type="Shader" path="res://vfx/toon.gdshader" id="10_toon_shader"]
+[ext_resource type="Shader" path="res://vfx/outline.gdshader" id="11_outline_shader"]
+[ext_resource type="Texture2D" path="res://vfx/toon_ramp.tres" id="12_toon_ramp"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_grain"]
-shader = ExtResource("3_grain")
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
+shader = ExtResource("11_outline_shader")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_visor"]
+shader = ExtResource("3_visor_shader")
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -20,10 +30,26 @@ _spawnable_scenes = PackedStringArray("res://levels/test_level.tscn")
 spawn_path = NodePath("../Level")
 spawn_limit = 1
 
+[node name="MaskAudio" type="Node" parent="."]
+script = ExtResource("8_mask_audio")
+
+[node name="ToonStyle" type="Node" parent="."]
+script = ExtResource("9_toon_style")
+ToonShader = ExtResource("10_toon_shader")
+OutlineMaterial = SubResource("ShaderMaterial_outline")
+Ramp = ExtResource("12_toon_ramp")
+
+[node name="HudViewport" type="SubViewport" parent="."]
+disable_3d = true
+transparent_bg = true
+render_target_update_mode = 4
+
+[node name="VisorHud" parent="HudViewport" instance=ExtResource("5_visor_hud")]
+
 [node name="PostFX" type="CanvasLayer" parent="."]
 
-[node name="Grain" type="ColorRect" parent="PostFX"]
-material = SubResource("ShaderMaterial_grain")
+[node name="Visor" type="ColorRect" parent="PostFX" node_paths=PackedStringArray("HudViewport")]
+material = SubResource("ShaderMaterial_visor")
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -31,11 +57,13 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
+script = ExtResource("4_visor")
+HudViewport = NodePath("../../HudViewport")
 
 [node name="UI" type="CanvasLayer" parent="."]
 layer = 2
 
-[node name="Hud" parent="UI" instance=ExtResource("4_hud")]
+[node name="Hud" parent="UI" instance=ExtResource("6_hud")]
 visible = false
 
-[node name="MainMenu" parent="UI" instance=ExtResource("5_menu")]
+[node name="MainMenu" parent="UI" instance=ExtResource("7_menu")]

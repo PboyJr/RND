@@ -13,7 +13,8 @@ namespace RND.Players;
 /// First-person researcher. Each client simulates its own player (so movement feels instant) and
 /// replicates the result; everyone else smooths toward the replicated state.
 /// The node is named after its owner's peer id, which is how authority gets assigned.
-/// Health is the exception: the host owns it, so clients can't ignore damage.
+/// Health and the gas mask filter (Respirator) are the exceptions: the host owns them, so clients
+/// can't ignore damage or breathe for free.
 /// </summary>
 public partial class Player : CharacterBody3D
 {
@@ -54,7 +55,7 @@ public partial class Player : CharacterBody3D
 	[Export] public float MaxHoldDistance { get; set; } = 3f;
 
 	[ExportGroup("Kit")]
-	// Hotbar items after the Hands slot: this character type's kit (Scientist: acid beaker).
+	// Hotbar items after the Hands slot: this character type's kit (Scientist: acid flask).
 	[Export] public Godot.Collections.Array<HotbarItem> Loadout { get; set; } = new();
 	[Export] public float RespawnDelay { get; set; } = 8f;
 
@@ -65,10 +66,12 @@ public partial class Player : CharacterBody3D
 	[Export] public float SyncPitch { get; set; }
 	[Export] public float SyncHoldDistance { get; set; } = 1.8f;
 	[Export] public int SelectedSlot { get; set; }
-	[Export] public bool SelectedItemReady { get; set; } = true;
+	[Export] public float SelectedItemCharge { get; set; } = 1f; // 0 = just used, 1 = ready
 
 	public int PeerId { get; private set; }
 	public Health Health { get; private set; }
+	public Respirator Respirator { get; private set; }
+	public Breathing Breathing { get; private set; }
 	public bool IsDead => Health?.IsDead ?? false;
 	public int SlotCount => Mathf.Min(1 + Loadout.Count, MaxSlots);
 	public Vector3 EyePosition => _head.GlobalPosition;
@@ -94,7 +97,11 @@ public partial class Player : CharacterBody3D
 			}
 
 			if (IsHolding)
-				return "[RMB] throw    [scroll] push / pull    release [LMB] to drop";
+				return _heldProp is FilterCanister
+					? "[E] screw it on    [RMB] throw    release [LMB] to drop"
+					: "[RMB] throw    [scroll] push / pull    release [LMB] to drop";
+			if (AimedProp is FilterCanister { HeldBy: 0 } canister)
+				return $"[E] screw on {canister.DisplayName}  ·  [LMB] grab";
 			if (AimedProp is { HeldBy: 0 } prop)
 				return $"[LMB] grab {prop.DisplayName}  ·  {prop.Mass:0.#} kg";
 			return "";
@@ -112,14 +119,15 @@ public partial class Player : CharacterBody3D
 	private RayCast3D _grabRay;
 	private MeshInstance3D _bodyMesh;
 	private MeshInstance3D _visor;
-	private MeshInstance3D _handItem;
+	private Node3D _handItem;
+	private Liquid _handLiquid;
+	private float _handFullFill;
 	private Label3D _nameLabel;
 	private StandardMaterial3D _bodyMaterial;
-	private StandardMaterial3D _handMaterial;
 	private Tween _flashTween;
 	private PhysicsProp _heldProp;
 	private float _gravity;
-	private Vector3 _lastFootstepPosition;
+	private Vector3 _lastHostPosition;
 	private float _footstepTimer;
 
 	// Per-slot "ready again at" times. The owner uses theirs for the HUD; the host keeps its own to validate throws.
@@ -131,11 +139,16 @@ public partial class Player : CharacterBody3D
 	public float GetCooldownRemaining(int slot) =>
 		slot >= 0 && slot < MaxSlots ? (float)Mathf.Max(0.0, _readyAt[slot] - Now) : 0f;
 
+	/// <summary>How recharged the item in this slot is: 0 = just used, 1 = ready.</summary>
+	public float GetCharge(int slot) =>
+		GetItem(slot) is { Cooldown: > 0f } item ? 1f - GetCooldownRemaining(slot) / item.Cooldown : 1f;
+
 	public override void _EnterTree()
 	{
 		PeerId = int.Parse(Name.ToString());
 		SetMultiplayerAuthority(PeerId);
-		GetNode("Health").SetMultiplayerAuthority(1); // health belongs to the host
+		GetNode("Health").SetMultiplayerAuthority(1); // health and filter belong to the host
+		GetNode("Respirator").SetMultiplayerAuthority(1);
 		ByPeer[PeerId] = this;
 	}
 
@@ -152,11 +165,15 @@ public partial class Player : CharacterBody3D
 		_head = GetNode<Node3D>("Head");
 		_camera = GetNode<Camera3D>("Head/Camera3D");
 		_grabRay = GetNode<RayCast3D>("Head/Camera3D/GrabRay");
-		_handItem = GetNode<MeshInstance3D>("Head/Camera3D/HandItem");
+		_handItem = GetNode<Node3D>("Head/Camera3D/HandItem");
+		_handLiquid = (Liquid)_handItem.FindChild("Liquid", owned: false); // wherever the model nests it
+		_handFullFill = _handLiquid.Fill;
 		_bodyMesh = GetNode<MeshInstance3D>("Body");
 		_visor = GetNode<MeshInstance3D>("Head/Visor");
 		_nameLabel = GetNode<Label3D>("NameLabel");
 		Health = GetNode<Health>("Health");
+		Respirator = GetNode<Respirator>("Respirator");
+		Breathing = GetNode<Breathing>("Breathing");
 		_gravity = (float)ProjectSettings.GetSetting("physics/3d/default_gravity");
 		_grabRay.TargetPosition = new Vector3(0, 0, -GrabRange);
 
@@ -226,11 +243,9 @@ public partial class Player : CharacterBody3D
 
 	public override void _Process(double delta)
 	{
-		// Everyone sees the equipped item in hand while it's charged.
-		HotbarItem item = GetItem(SelectedSlot);
-		_handItem.Visible = item != null && SelectedItemReady && !IsDead;
-		if (item != null)
-			_handMaterial.AlbedoColor = item.Tint with { A = 0.75f };
+		// Everyone sees the equipped flask in hand, and its acid refilling as it recharges.
+		_handItem.Visible = GetItem(SelectedSlot) != null && !IsDead;
+		_handLiquid.Fill = _handFullFill * SelectedItemCharge;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -243,9 +258,10 @@ public partial class Player : CharacterBody3D
 
 			if (SelectedSlot == HandsSlot)
 				UpdateCarrying();
-			else
-				UpdateItemUse();
-			SelectedItemReady = GetCooldownRemaining(SelectedSlot) <= 0f;
+			else if (CanAct && Input.IsActionJustPressed("primary"))
+				UseSelectedItem();
+			SelectedItemCharge = GetCharge(SelectedSlot);
+			UpdateFilterSwap();
 
 			if (GlobalPosition.Y < KillPlaneY)
 				MoveToSpawnPoint();
@@ -258,19 +274,24 @@ public partial class Player : CharacterBody3D
 		}
 
 		if (Multiplayer.IsServer())
-			MakeFootstepNoise(dt);
+			BreatheAndMakeFootstepNoise(dt);
 	}
 
-	// Host only. Judged from how far the player actually moved, so it works the same for remote
-	// players (which the host only sees as replicated positions). Walking is quiet, sprinting carries.
-	private void MakeFootstepNoise(float dt)
+	// Host only. Effort is judged from how far the player actually moved, so it works the same for
+	// remote players (which the host only sees as replicated positions). Harder breathing drains the
+	// filter faster; walking is quiet, sprinting carries.
+	private void BreatheAndMakeFootstepNoise(float dt)
 	{
-		Vector3 moved = GlobalPosition - _lastFootstepPosition;
-		_lastFootstepPosition = GlobalPosition;
-		_footstepTimer -= dt;
-
+		Vector3 moved = GlobalPosition - _lastHostPosition;
+		_lastHostPosition = GlobalPosition;
 		float speed = new Vector2(moved.X, moved.Z).Length() / dt;
-		if (IsDead || speed < 1f || speed > 20f || _footstepTimer > 0f) // > 20 m/s is a teleport or respawn
+		if (speed > 20f)
+			speed = 0f; // a teleport or respawn, not effort
+
+		Respirator.Breathe(dt, Mathf.Clamp((speed - 1f) / (SprintSpeed - 1f), 0f, 1f), Health);
+
+		_footstepTimer -= dt;
+		if (IsDead || speed < 1f || _footstepTimer > 0f)
 			return;
 
 		bool sprinting = speed > (WalkSpeed + SprintSpeed) / 2f;
@@ -311,10 +332,9 @@ public partial class Player : CharacterBody3D
 		SelectedSlot = slot;
 	}
 
-	private void UpdateItemUse()
+	/// <summary>Owner side: throw the selected item if it's charged. (The host re-checks.)</summary>
+	public void UseSelectedItem()
 	{
-		if (!CanAct || !Input.IsActionJustPressed("primary"))
-			return;
 		if (GetItem(SelectedSlot) is not ThrowableItem item || GetCooldownRemaining(SelectedSlot) > 0f)
 			return;
 
@@ -369,6 +389,17 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
+	// [E] on a spare filter (the one in your hands first, else the one you're looking at) screws it on.
+	private void UpdateFilterSwap()
+	{
+		if (!CanAct || !Input.IsActionJustPressed("interact"))
+			return;
+
+		var canister = (IsHolding ? _heldProp : AimedProp) as FilterCanister;
+		if (canister is { Consumed: false })
+			canister.RpcId(1, nameof(FilterCanister.RequestUse));
+	}
+
 	private void ReleaseHeldProp()
 	{
 		if (_heldProp != null && IsInstanceValid(_heldProp))
@@ -398,6 +429,7 @@ public partial class Player : CharacterBody3D
 	private void OnRevived()
 	{
 		SetDeadVisuals(false);
+		Respirator.Refill(); // new life, new mask, new filter (host only; ignored elsewhere)
 		if (IsMultiplayerAuthority())
 		{
 			MoveToSpawnPoint();
@@ -446,8 +478,6 @@ public partial class Player : CharacterBody3D
 			Roughness = 0.8f,
 		};
 		_bodyMesh.MaterialOverride = _bodyMaterial;
-		_handMaterial = (StandardMaterial3D)_handItem.GetActiveMaterial(0).Duplicate();
-		_handItem.MaterialOverride = _handMaterial;
 		_nameLabel.Text = PeerId == 1 ? "Host" : $"Researcher {PeerId % 1000}";
 
 		if (isLocal)

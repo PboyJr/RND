@@ -1,0 +1,66 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://ui/VisorHud.cs" id="1_visor_hud"]
+[ext_resource type="Script" path="res://ui/HotbarView.cs" id="2_hotbar"]
+
+[node name="VisorHud" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_visor_hud")
+
+[node name="Crosshair" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -2.0
+offset_top = -2.0
+offset_right = 2.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.6, 1, 0.55, 0.9)
+
+[node name="Hint" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.25
+anchor_top = 0.64
+anchor_right = 0.75
+anchor_bottom = 0.7
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.6, 1, 0.55, 1)
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Hotbar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 0.72
+anchor_right = 0.5
+anchor_bottom = 0.83
+offset_left = -150.0
+offset_right = 150.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+alignment = 1
+script = ExtResource("2_hotbar")
+
+[node name="Filter" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.16
+anchor_top = 0.77
+anchor_right = 0.42
+anchor_bottom = 0.83
+theme_override_colors/font_color = Color(0.6, 1, 0.55, 1)
+theme_override_font_sizes/font_size = 16
+vertical_alignment = 1

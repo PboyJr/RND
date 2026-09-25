@@ -1,10 +1,33 @@
 using Godot;
+using RND.Audio;
 
 namespace RND.Vfx;
 
-/// <summary>One-shot visual effects the host triggers for everyone (splashes, deaths). Lives in each level.</summary>
+/// <summary>One-shot effects the host triggers for everyone (splashes, sounds). Lives in each level.</summary>
 public partial class Effects : Node3D
 {
+	/// <summary>
+	/// A positional world sound on the "World" bus (so it's muffled by the listener's mask). Loudness
+	/// is the same radius the AI hears it at, so what you hear and what it hears line up. Use
+	/// Level.EmitSound rather than calling this directly.
+	/// </summary>
+	[Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	public void PlaySound(int sound, Vector3 position, float loudness)
+	{
+		var speaker = new AudioStreamPlayer3D
+		{
+			Stream = SoundBank.Get((SoundKind)sound),
+			Bus = "World",
+			UnitSize = loudness * 0.4f,
+			MaxDistance = loudness * 2.5f,
+			PitchScale = (float)GD.RandRange(0.9, 1.1),
+		};
+		AddChild(speaker);
+		speaker.GlobalPosition = position;
+		speaker.Finished += speaker.QueueFree;
+		speaker.Play();
+	}
+
 	[Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	public void Splash(Vector3 position, Vector3 normal, Color color, float radius)
 	{

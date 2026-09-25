@@ -1,21 +1,6 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://ui/Hud.cs" id="1_hud"]
-[ext_resource type="Script" path="res://ui/HotbarView.cs" id="2_hotbar"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_bg"]
-bg_color = Color(0.05, 0.06, 0.07, 0.75)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_fill"]
-bg_color = Color(0.75, 0.15, 0.12, 0.9)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
 
 [node name="Hud" type="Control"]
 layout_mode = 3
@@ -27,101 +12,6 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_hud")
 
-[node name="DamageFlash" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(0.7, 0, 0, 0)
-
-[node name="Crosshair" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -2.0
-offset_top = -2.0
-offset_right = 2.0
-offset_bottom = 2.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-color = Color(1, 1, 1, 0.8)
-
-[node name="Hint" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -320.0
-offset_top = -140.0
-offset_right = 320.0
-offset_bottom = -110.0
-grow_horizontal = 2
-grow_vertical = 0
-horizontal_alignment = 1
-
-[node name="Hotbar" type="HBoxContainer" parent="."]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -200.0
-offset_top = -96.0
-offset_right = 200.0
-offset_bottom = -20.0
-grow_horizontal = 2
-grow_vertical = 0
-mouse_filter = 2
-theme_override_constants/separation = 8
-alignment = 1
-script = ExtResource("2_hotbar")
-
-[node name="Health" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 20.0
-offset_top = -52.0
-offset_right = 260.0
-offset_bottom = -24.0
-grow_vertical = 0
-mouse_filter = 2
-
-[node name="Bar" type="ProgressBar" parent="Health"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-theme_override_styles/background = SubResource("StyleBoxFlat_health_bg")
-theme_override_styles/fill = SubResource("StyleBoxFlat_health_fill")
-value = 100.0
-show_percentage = false
-
-[node name="Text" type="Label" parent="Health"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "100 / 100"
-horizontal_alignment = 1
-vertical_alignment = 1
-
 [node name="Status" type="Label" parent="."]
 modulate = Color(1, 1, 1, 0.6)
 layout_mode = 0
@@ -129,6 +19,22 @@ offset_left = 16.0
 offset_top = 12.0
 offset_right = 416.0
 offset_bottom = 38.0
+
+[node name="DebugHealth" type="ProgressBar" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 40.0
+offset_right = 216.0
+offset_bottom = 67.0
+mouse_filter = 2
+value = 100.0
+
+[node name="DebugFilter" type="Label" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 70.0
+offset_right = 316.0
+offset_bottom = 96.0
 
 [node name="DeathLabel" type="Label" parent="."]
 visible = false

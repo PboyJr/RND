@@ -1,0 +1,56 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://vfx/Liquid.cs" id="1_liquid"]
+[ext_resource type="Shader" path="res://vfx/liquid.gdshader" id="2_liquid_shader"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+transparency = 1
+albedo_color = Color(0.8, 0.95, 0.92, 0.28)
+metallic = 0.1
+roughness = 0.05
+rim_enabled = true
+rim = 0.8
+rim_tint = 0.2
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_body"]
+material = SubResource("StandardMaterial3D_glass")
+top_radius = 0.028
+bottom_radius = 0.08
+height = 0.15
+radial_segments = 24
+rings = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_neck"]
+material = SubResource("StandardMaterial3D_glass")
+top_radius = 0.027
+bottom_radius = 0.026
+height = 0.06
+radial_segments = 16
+rings = 1
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_liquid"]
+render_priority = 0
+shader = ExtResource("2_liquid_shader")
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_liquid"]
+material = SubResource("ShaderMaterial_liquid")
+top_radius = 0.024
+bottom_radius = 0.074
+height = 0.145
+radial_segments = 24
+rings = 1
+
+[node name="ErlenmeyerFlask" type="Node3D"]
+
+[node name="Glass" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.075, 0)
+mesh = SubResource("CylinderMesh_body")
+
+[node name="Neck" type="MeshInstance3D" parent="Glass"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.105, 0)
+mesh = SubResource("CylinderMesh_neck")
+
+[node name="Liquid" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0745, 0)
+mesh = SubResource("CylinderMesh_liquid")
+script = ExtResource("1_liquid")

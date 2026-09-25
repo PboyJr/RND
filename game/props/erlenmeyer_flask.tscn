@@ -1,0 +1,37 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://props/PhysicsProp.cs" id="1_prop"]
+[ext_resource type="PackedScene" path="res://models/erlenmeyer_flask.tscn" id="2_model"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_flask"]
+height = 0.21
+radius = 0.078
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_prop"]
+properties/0/path = NodePath(".:SyncPosition")
+properties/0/spawn = false
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:SyncRotation")
+properties/1/spawn = false
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:HeldBy")
+properties/2/spawn = false
+properties/2/replication_mode = 2
+
+[node name="ErlenmeyerFlask" type="RigidBody3D"]
+collision_layer = 4
+collision_mask = 15
+mass = 0.4
+continuous_cd = true
+script = ExtResource("1_prop")
+DisplayName = "Erlenmeyer flask"
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CylinderShape3D_flask")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.105, 0)
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_interval = 0.033
+replication_config = SubResource("SceneReplicationConfig_prop")

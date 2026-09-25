@@ -10,6 +10,7 @@ Godot 4.7 (.NET / C#), Jolt physics, ENet networking for now.
 - [Design](docs/DESIGN.md): game ideas, mechanics, open questions
 - [Decisions](docs/DECISIONS.md): tech choices and why, known limitations
 - [Roadmap](docs/ROADMAP.md): what's done, what's next
+- [Art pipeline](docs/ART.md): how to hand models over (format, scale, naming, liquids)
 
 Keep these updated when things change. If it isn't written down, we'll forget it.
 
@@ -76,27 +77,37 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | Hold LMB with Hands | Grab and carry (let go to drop; props keep momentum, so you can fling them) |
 | RMB while carrying | Throw the prop |
 | Scroll while carrying | Push / pull |
-| LMB with the acid beaker | Throw it (15 s recharge) |
+| LMB with the acid flask | Throw it (15 s recharge; the flask in your hand refills) |
+| E on (or holding) a spare filter | Screw it onto your mask |
+| F2 | Toggle the cel-shaded look (prototype), to compare |
 | Esc | Free the mouse, leave session |
 
-The evil guy only knows what it sees and hears. Sprinting, shattering beakers and crashing props
-are loud, walking is quiet. Its eyes show its mood: dim = calm, orange = suspicious,
-red = hunting you.
+You see everything through a gas mask. **The cracks in the glass are your health**; there's no
+health number, except a plain debug bar in the corner. Your **filter** runs down (faster when you
+sprint), and when it's spent you choke. Find spare filter canisters and screw them on. Play with
+sound on: you hear your own breathing (it wheezes as the filter wears), a heartbeat when you're
+badly hurt, and the world muffled through the mask, less so the more it's cracked.
+
+The evil guy only knows what it sees and hears. Sprinting, shattering flasks, crashing props and
+fresh filters are loud, walking is quiet. Its eyes show its mood: dim = calm,
+orange = suspicious, red = hunting you.
 
 ## Layout
 
 ```
 game/
   core/      Main scene, Network autoload (the only code that knows the transport), layers
-  combat/    Health component (host-owned, replicated)
+  combat/    Health + Respirator (gas mask filter) components (host-owned, replicated)
   enemies/   The evil guy
-  items/     Hotbar items (.tres data) + thrown projectiles (acid beaker)
-  levels/    Level base script + test_level greybox (CSG)
+  items/     Hotbar items (.tres data) + thrown projectiles (acid flask)
+  models/    Model scenes shared by props, hand items and projectiles (Erlenmeyer flask)
+  levels/    Level base script, drop-link generator, test_level greybox (CSG)
   players/   First-person researcher (Scientist kit)
-  props/     PhysicsProp + crate / heavy case / specimen jar
-  ui/        Main menu, HUD, hotbar
-  vfx/       Grain post-process, hit flashes, splash effects
-  tests/     Headless smoke test
+  props/     PhysicsProp + crate / heavy case / specimen jar / spare filter
+  ui/        Main menu, crisp overlay (hud), HUD projected on the visor (visor_hud), hotbar
+  audio/     Procedural sound: world sound bank, in-mask synth (breathing, heartbeat), previews
+  vfx/       Visor shader (mask + cracks + grain), hit flashes, splash effects
+  tests/     Smoke test (headless checks + windowed screenshot capture)
 docs/        Design, decisions, roadmap
 ```
 
@@ -126,8 +137,25 @@ godot --headless res://tests/smoke_test.tscn -- --role=client   # ...then: join,
 
 Each prints `SMOKE PASS` or `SMOKE FAIL: ...` and exits 0 / 1.
 
+Shaders can't render headless, so the visor has a **visual check** instead. It opens a window for
+a few seconds and saves screenshots: cel shading off / on, a flask sloshing, the acid flask in
+hand (full, then refilling), and the mask healthy, hurt and choking:
+
+```
+godot --resolution 1280x720 res://tests/smoke_test.tscn -- --role=capture --out=C:/some/folder
+```
+
+All sounds are generated in code. To **listen** to them without playing (and check nothing clips),
+render every sound to `.wav`:
+
+```
+godot --headless res://tests/smoke_test.tscn -- --role=audio --out=C:/some/folder
+```
+
 ## Notes
 
 - Commit the `.uid` files Godot creates next to scripts and shaders.
-- Tune the grain / vignette / colour crush on `Main/PostFX/Grain`'s material.
+- Tune the cel-shading outlines (width, colour) on `Main/ToonStyle`'s Outline Material.
+- Tune the visor and camera look (glass curve, rim colour, grain, colour crush) on
+  `Main/PostFX/Visor`'s material. Breathing and sway feel are exports on the `Visor` node.
 - What's next: see the [Roadmap](docs/ROADMAP.md).
