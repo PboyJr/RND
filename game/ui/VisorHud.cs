@@ -68,7 +68,8 @@ public partial class VisorHud : Control
 		if (exit == null)
 			return "";
 
-		return $"{(exit.IsComplete ? "TEST COMPLETE" : "TEST IN PROGRESS")}\n{Clock(exit.Elapsed)}";
+		string test = MazeRun.Current is { Active: true } run ? $"TEST {run.Chamber + 1} OF {run.Length}" : "TEST";
+		return $"{test} {(exit.IsComplete ? "COMPLETE" : "IN PROGRESS")}\n{Clock(exit.Elapsed)}";
 	}
 
 	private static string Clock(float seconds) => $"{(int)seconds / 60:00}:{seconds % 60f:00.0}";

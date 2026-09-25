@@ -123,7 +123,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 <header>
 	<p class="eyebrow">Team handbook · updated 25 Sep 2026</p>
 	<h1>RND<span>.</span></h1>
-	<p class="lede">A co-op horror game where a team of researchers goes into places where unknown creatures live, grabs evidence and specimens, gets out alive, and sells what they found.</p>
+	<p class="lede">A co-op horror game where a team of scientists goes into places where unknown creatures live to research and test them, and tries to get out alive.</p>
 	<p>This page is the plain-English version of where the project stands, so everyone is working from the same picture. Every idea carries a tag:</p>
 	<div class="legend">
 		<span><span class="pill decided">Decided</span> locked in</span>
@@ -136,7 +136,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 <section id="game">
 	<h2>The game in one minute</h2>
 	<p>Think <strong>R.E.P.O.</strong>: you and your friends carry fragile things through a dangerous place using real physics, and it gets chaotic. On top of that we add a gas mask you see the whole game through, a filter that runs out, and a creature that hunts you by sight and sound.</p>
-	<p>You sell what you bring back to <strong>the government</strong>, or to <strong>the black market</strong> for more money and a chance of getting fined. Between rounds you spend it on upgrades and a research tree.</p>
+	<p>You're there to <strong>research and test</strong>: collect data and specimens, run tests, and bring them back. Between rounds, that research turns into upgrades and a research tree. What exactly research earns you, and whether selling it (to the government or the black market) is part of the game, is <span class="pill open">Open</span>.</p>
 	<p><strong>Our one rule <span class="pill decided">Decided</span>:</strong> make everything as smart and reactive as possible. Creatures react to what's actually happening instead of following a script. If it's a choice between a simple scripted trick and something that genuinely reacts, we pick the reactive one and fix its rough edges.</p>
 	<p class="muted">Inspired by R.E.P.O. (carrying, co-op chaos), Portal (test chambers, physics puzzles), Phasmophobia (prestige), Factorio (research tree) and crate opening.</p>
 </section>
@@ -157,9 +157,9 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<p>The retrieval mode, the one most like R.E.P.O. <span class="pill leaning">Leaning</span></p>
 	<ol class="loop">
 		<li><span><strong>Deploy</strong> into a site where something lives.</span></li>
-		<li><span><strong>Collect</strong> evidence, data and specimens while dealing with the creatures.</span></li>
+		<li><span><strong>Research and test:</strong> collect data and specimens and run tests while dealing with the creatures.</span></li>
 		<li><span><strong>Get out</strong> alive with what you carried.</span></li>
-		<li><span><strong>Sell</strong> to the government, or the black market for more money and a risk of a fine.</span></li>
+		<li><span><strong>Hand in</strong> the research. What it earns, and whether selling is part of it, is still open.</span></li>
 		<li><span><strong>Upgrade</strong> between rounds: research tree, upgrades, crate opening. Never mid-round.</span></li>
 	</ol>
 	<p><strong>Your characters last <span class="pill leaning">Leaning</span>.</strong> Unlike R.E.P.O., characters are saved between sessions. The twist: a character you don't play gets rusty. "Time" means runs played on your other characters, not days on the calendar, so taking a break never hurts you. How characters are saved is <span class="pill decided">Decided</span>; which abilities decay and by how much is still open.</p>
@@ -261,6 +261,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>Where every idea stands</h2>
 	<div class="table"><table>
 		<tr><th>Topic</th><th>Status</th><th>In short</th></tr>
+		<tr><td>Pitch</td><td><span class="pill decided">Decided</span></td><td>Scientists researching and testing creatures (no longer selling evidence)</td></tr>
 		<tr><td>Engine</td><td><span class="pill decided">Decided</span></td><td>Godot, with C# code</td></tr>
 		<tr><td>Gas mask view</td><td><span class="pill decided">Decided</span></td><td>One wide visor; cracks are your health, no number</td></tr>
 		<tr><td>Filter</td><td><span class="pill decided">Decided</span></td><td>Runs out; timings still being tuned</td></tr>
@@ -268,7 +269,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Hotbar</td><td><span class="pill decided">Decided</span></td><td>Slot 1 hands, 2–5 your kit</td></tr>
 		<tr><td>Saving characters</td><td><span class="pill decided">Decided</span></td><td>Saved on your own computer; the host sanity-checks it</td></tr>
 		<tr><td>Twist stays hidden</td><td><span class="pill decided">Decided</span></td><td>Clues only, never spelled out</td></tr>
-		<tr><td>Round loop</td><td><span class="pill leaning">Leaning</span></td><td>Deploy, collect, extract, sell, upgrade</td></tr>
+		<tr><td>Round loop</td><td><span class="pill leaning">Leaning</span></td><td>Deploy, research, extract, hand in, upgrade</td></tr>
 		<tr><td>Art style</td><td><span class="pill leaning">Leaning</span></td><td>Mid-poly, comic-book shading, grainy camera</td></tr>
 		<tr><td>Classes</td><td><span class="pill leaning">Leaning</span></td><td>Each scientist type brings a kit; only the Scientist exists</td></tr>
 		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health, timed respawn as a stand-in</td></tr>
@@ -276,7 +277,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Characters that rust</td><td><span class="pill leaning">Leaning</span></td><td>Benched characters get worse</td></tr>
 		<tr><td>Rat lore</td><td><span class="pill idea">Idea</span></td><td>You are a rat with a human brain</td></tr>
 		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research</td></tr>
-		<tr><td>Black market</td><td><span class="pill idea">Idea</span></td><td>Pays more, risk of a fine</td></tr>
+		<tr><td>Selling</td><td><span class="pill open">Open</span></td><td>Does selling stay at all? The black market idea is on hold</td></tr>
 		<tr><td>Research tree</td><td><span class="pill idea">Idea</span></td><td>Factorio-style, between rounds</td></tr>
 		<tr><td>Prestige</td><td><span class="pill idea">Idea</span></td><td>Phasmophobia-style rebirth</td></tr>
 		<tr><td>Players as monsters</td><td><span class="pill idea">Idea</span></td><td>Played from a phone, as a different kind of game. Try on PC first</td></tr>
@@ -300,8 +301,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>Open questions</h2>
 	<p>Things nobody has answered yet. Bring opinions.</p>
 	<ul class="questions">
-		<li><span class="label">Loot</span><span>Does loot have a value that drops when it gets damaged? Is there evidence you don't carry (photos, recordings)?</span></li>
-		<li><span class="label">Selling</span><span>How do you get caught on the black market, who pays the fine, and can it follow you into rounds?</span></li>
+		<li><span class="label">Loot</span><span>Does loot have a value that drops when it gets damaged? Is there research you don't carry (photos, recordings, readings)?</span></li>
+		<li><span class="label">Selling</span><span>Does selling stay now that the game is about research and testing? What does research earn you? If the black market stays, how do you get caught and who pays the fine?</span></li>
 		<li><span class="label">Death</span><span>Timed respawn, a teammate revives you, or out for the round? What exactly do you lose?</span></li>
 		<li><span class="label">Healing</span><span>Right now only respawning heals. Should anything else?</span></li>
 		<li><span class="label">Characters</span><span>Which abilities get rusty, how fast, and can you train them back? Are upgrades per character or shared?</span></li>
@@ -309,7 +310,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><span class="label">Acid</span><span>Should it hurt teammates? Should it leave puddles?</span></li>
 		<li><span class="label">Filter</span><span>Is 180 s right? Should swapping take time? Where do spares come from?</span></li>
 		<li><span class="label">Readability</span><span>Do the cracks and HUD glitches read clearly enough to drop the debug bars?</span></li>
-		<li><span class="label">Lore</span><span>Does the rat story replace the "selling evidence" pitch or reframe it? What is the evil guy? How does the madness build and go away?</span></li>
+		<li><span class="label">Lore</span><span>What is the evil guy, to a rat? How does the madness build and go away?</span></li>
 		<li><span class="label">Modes</span><span>What do payload and research play like? Picked per round, per run, or voted?</span></li>
 		<li><span class="label">Maze</span><span>How many rooms? Does the whole team dying end it?</span></li>
 		<li><span class="label">Monsters</span><span>What can monster players do, how many per match, phone or PC?</span></li>
@@ -325,8 +326,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li>Footstep sounds, hearing teammates breathe, retuning or recording real sounds</li>
 		<li>Deeper filter: swaps that take time, gas zones, filter types</li>
 		<li>Smarter creature: learns your habits, reacts to light, several that share what they notice</li>
-		<li>More scientist types, more creatures, more kinds of evidence</li>
-		<li>Selling, the between-round hub, research tree, crate opening, prestige</li>
+		<li>More scientist types, more creatures, more kinds of research</li>
+		<li>The between-round hub, research tree, crate opening, prestige</li>
 		<li>Saved characters (designed, not built)</li>
 		<li>Players as monsters</li>
 		<li>Art pass: real models, lighting, sound</li>

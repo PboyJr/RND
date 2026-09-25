@@ -1,9 +1,11 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using RND.Combat;
 using RND.Core;
 using RND.Items;
 using RND.Levels;
+using RND.Maze;
 using RND.Props;
 using RND.Vfx;
 
@@ -26,6 +28,9 @@ public partial class Player : CharacterBody3D
 	private const float KillPlaneY = -30f;
 	private const float MaxThrowOriginError = 2.5f; // how far a throw may start from where the host thinks our eyes are
 	private const float CooldownTolerance = 1f;     // seconds of slack for network jitter in the host's cooldown check
+	private const float ReviveRange = 2f;
+	private const float ReviveSeconds = 3f;
+	private const float ReviveHealth = 50f;
 	private static readonly Color HurtColor = new(1f, 0.2f, 0.15f);
 
 	private static readonly Dictionary<int, Player> ByPeer = new();
@@ -88,6 +93,11 @@ public partial class Player : CharacterBody3D
 			if (IsDead)
 				return "";
 
+			if (_reviveTarget != null)
+				return $"Reviving… {Mathf.FloorToInt(_reviveProgress * 100f)}%";
+			if (DownedTeammateInView != null)
+				return "[hold E] revive";
+
 			if (GetItem(SelectedSlot) is { } item)
 			{
 				float remaining = GetCooldownRemaining(SelectedSlot);
@@ -96,6 +106,8 @@ public partial class Player : CharacterBody3D
 					: $"[LMB] throw {item.DisplayName.ToLower()}";
 			}
 
+			if (_grabRay.GetCollider() is ChamberButton)
+				return "[E] press";
 			if (IsHolding)
 				return _heldProp is FilterCanister
 					? "[E] screw it on    [RMB] throw    release [LMB] to drop"
@@ -114,6 +126,11 @@ public partial class Player : CharacterBody3D
 	private PhysicsProp AimedProp => _grabRay.GetCollider() as PhysicsProp;
 	private bool IsHolding => _heldProp != null && IsInstanceValid(_heldProp) && _heldProp.HeldBy == PeerId;
 
+	// A downed teammate close by that you're roughly looking at.
+	private Player DownedTeammateInView => All.FirstOrDefault(p => p != this && p.IsDead
+		&& p.GlobalPosition.DistanceTo(GlobalPosition) < ReviveRange
+		&& AimDirection.Dot((p.GlobalPosition + Vector3.Up * 0.3f - EyePosition).Normalized()) > 0.8f);
+
 	private Node3D _head;
 	private Camera3D _camera;
 	private RayCast3D _grabRay;
@@ -129,6 +146,8 @@ public partial class Player : CharacterBody3D
 	private float _gravity;
 	private Vector3 _lastHostPosition;
 	private float _footstepTimer;
+	private Player _reviveTarget;
+	private float _reviveProgress;
 
 	// Per-slot "ready again at" times. The owner uses theirs for the HUD; the host keeps its own to validate throws.
 	private readonly double[] _readyAt = new double[MaxSlots];
@@ -261,7 +280,8 @@ public partial class Player : CharacterBody3D
 			else if (CanAct && Input.IsActionJustPressed("primary"))
 				UseSelectedItem();
 			SelectedItemCharge = GetCharge(SelectedSlot);
-			UpdateFilterSwap();
+			UpdateInteract();
+			UpdateRevive(dt);
 
 			if (GlobalPosition.Y < KillPlaneY)
 				MoveToSpawnPoint();
@@ -389,11 +409,18 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
-	// [E] on a spare filter (the one in your hands first, else the one you're looking at) screws it on.
-	private void UpdateFilterSwap()
+	// [E] presses the button you're looking at, or screws on a spare filter (the one in your hands
+	// first, else the one you're looking at).
+	private void UpdateInteract()
 	{
 		if (!CanAct || !Input.IsActionJustPressed("interact"))
 			return;
+
+		if (_grabRay.GetCollider() is ChamberButton button)
+		{
+			button.RpcId(1, nameof(ChamberButton.RequestPress));
+			return;
+		}
 
 		var canister = (IsHolding ? _heldProp : AimedProp) as FilterCanister;
 		if (canister is { Consumed: false })
@@ -416,7 +443,8 @@ public partial class Player : CharacterBody3D
 		if (IsMultiplayerAuthority())
 			ReleaseHeldProp();
 
-		if (Multiplayer.IsServer())
+		// Levels without timed respawn (maze chambers) leave you down until a teammate revives you.
+		if (Multiplayer.IsServer() && (Level.Current?.TimedRespawn ?? true))
 		{
 			GetTree().CreateTimer(RespawnDelay).Timeout += () =>
 			{
@@ -426,15 +454,51 @@ public partial class Player : CharacterBody3D
 		}
 	}
 
+	// A full-health revive is a respawn: new mask, new filter, back at a spawn point. A teammate's
+	// revive (less than full) leaves you where you fell, with the filter you had.
 	private void OnRevived()
 	{
 		SetDeadVisuals(false);
-		Respirator.Refill(); // new life, new mask, new filter (host only; ignored elsewhere)
+		if (Health.Current < Health.MaxHealth)
+			return;
+
+		Respirator.Refill(); // host only; ignored elsewhere
 		if (IsMultiplayerAuthority())
 		{
 			MoveToSpawnPoint();
 			WriteSyncState();
 		}
+	}
+
+	// Hold [E] on a downed teammate for a few seconds to bring them back.
+	private void UpdateRevive(float dt)
+	{
+		Player target = CanAct && Input.IsActionPressed("interact") ? DownedTeammateInView : null;
+		if (target != _reviveTarget)
+		{
+			_reviveTarget = target;
+			_reviveProgress = 0f;
+		}
+		if (target == null)
+			return;
+
+		_reviveProgress += dt / ReviveSeconds;
+		if (_reviveProgress < 1f)
+			return;
+
+		target.RpcId(1, MethodName.RequestRevive);
+		_reviveProgress = 0f; // if the host says no, holding on tries again
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void RequestRevive()
+	{
+		if (!Multiplayer.IsServer() || !IsDead)
+			return;
+
+		if (TryGet(Multiplayer.SenderId(), out Player reviver) && reviver != this && !reviver.IsDead
+			&& reviver.GlobalPosition.DistanceTo(GlobalPosition) < ReviveRange + 1f) // slack for lag
+			Health.ReviveTo(ReviveHealth);
 	}
 
 	// ── Networking ──────────────────────────────────────────────────────────────

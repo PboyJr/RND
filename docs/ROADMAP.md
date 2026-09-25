@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (player data storage designed; M7 maze mode started: level picker and the first test chamber with a start and an end)
+Last updated: 2026-09-25 (M8 started: maze runs with a pass / fail result, teammate revive)
 
 ---
 
@@ -105,9 +105,31 @@ Goal: sound sells the mask as much as the visor does.
 - [x] Mental damage: one health pool, physical cracks the glass, mental corrupts the HUD (text
       scramble, tearing, dropouts, sickly green), narrows vision and rings in your ears. Low gas
       (below 15%) deals it as withdrawal, replacing physical choke damage. Purple debug bar
-- [ ] Puzzle pieces: pressure plate + door, timed button
+- [x] Pressure plate (pressed by weight) + sliding door; the test chamber's exit needs the heavy
+      case on the plate
+- [x] Timed button ([E] or a thrown prop), doors that wait for whatever's in the way (a crate
+      jams them), and the heavy case in a closet behind a button door
 - [ ] Chain chambers into a maze (REPO-style stitched rooms), difficulty ramp
 - [ ] The evil guy as a maze "variable"
+
+### M8: A maze run: from proof of concept to a game (in progress)
+
+The first complete loop is the **maze run** (chosen 2026-09-25 over REPO retrieval): start → get
+through the chambers under pressure → pass or fail → reward → go again.
+
+- [x] **The run:** "Maze run" in the menu starts a run of 3 chambers. Passing one loads the next
+      ("TEST 2 OF 3" on the visor), and passing the last passes the run. A result screen follows,
+      then a new run
+- [x] **Teammate revive:** in chambers you don't respawn. You're down until a teammate holds [E]
+      on you for 3 s (back at 50 health, where you fell). **Everyone down at once fails the run**
+- [ ] **The evil guy in chambers:** doors must block its pathfinding first (see DECISIONS known
+      limitations). Without it, there's nothing that can make you lose
+- [ ] **Rewards:** the run pays out (money / XP) into the local profile (`user://profile.json`,
+      see DESIGN → How player data is stored), and `RunCount` goes up at run start
+- [ ] **More chambers** (content), so a run isn't the same room three times, then the difficulty
+      ramp and the party-level starting difficulty
+- [ ] Between runs: somewhere to spend the reward (upgrades / research tree), instead of an
+      automatic restart
 
 ---
 
@@ -115,7 +137,7 @@ Goal: sound sells the mask as much as the visor does.
 
 | Option | What it proves | Notes |
 | --- | --- | --- |
-| **Valuables + round loop** ⭐ recommended | It's a *game*, not a tech demo | Props with value and fragility (damage costs money), sell / extraction point, round timer, end-of-round payout. Works entirely on the current LAN setup. Now there's a threat to survive while doing it. |
+| **Valuables + round loop** ⭐ recommended | It's a *game*, not a tech demo | Research props with value and fragility (damage loses value), extraction / hand-in point, round timer, end-of-round reward (what it pays in is `Open`). Works entirely on the current LAN setup. Now there's a threat to survive while doing it. |
 | **Combat polish** | Fighting feels good | Acid puddles, flask prediction for the thrower, enemy reacts to thrown props, better death (revive?), sounds. |
 | **Steam lobbies + relay** | Friends can play over the internet | Choose Facepunch.Steamworks or GodotSteam. Swap goes in `core/Network.cs`. Needed before any remote playtest. |
 | **Proximity voice** | The REPO social magic | Easiest after Steam (Steam Voice). |
@@ -134,7 +156,8 @@ Rough order, and likely to change:
 - **More archetypes + kits** (the hotbar and item system are ready for them)
 - **More entity types** (the evil guy is v1)
 - **Evidence types:** beyond physical props (photos, recordings, readings?)
-- **Selling:** government vs black market, getting-caught fines
+- **Selling** (`Open` whether it stays, since the pitch is now research and testing): government
+  vs black market, getting-caught fines
 - **Between-round hub:** research / upgrade tree (Factorio-ish), crate opening
 - **Persistent characters + decay:** storage is designed (local profile JSON, host-clamped, decay
   in runs; see DESIGN). Still needs the abilities and the decay curve before it's worth building.

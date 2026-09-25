@@ -13,6 +13,7 @@
 [ext_resource type="Shader" uid="uid://cmugx6gpn6oq4" path="res://vfx/outline.gdshader" id="11_outline_shader"]
 [ext_resource type="Texture2D" uid="uid://dxgmebh60xgii" path="res://vfx/toon_ramp.tres" id="12_toon_ramp"]
 [ext_resource type="PackedScene" path="res://maze/test_chamber.tscn" id="13_chamber"]
+[ext_resource type="Script" path="res://maze/MazeRun.cs" id="14_run"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
 render_priority = 0
@@ -53,6 +54,10 @@ Levels = Array[PackedScene]([ExtResource("2_level"), ExtResource("13_chamber")])
 _spawnable_scenes = PackedStringArray("res://levels/test_level.tscn", "res://maze/test_chamber.tscn")
 spawn_path = NodePath("../Level")
 spawn_limit = 1
+
+[node name="Run" type="Node" parent="."]
+script = ExtResource("14_run")
+Chambers = Array[PackedScene]([ExtResource("13_chamber")])
 
 [node name="MaskAudio" type="Node" parent="." unique_id=2052791583]
 script = ExtResource("8_mask_audio")

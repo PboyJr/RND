@@ -1,7 +1,7 @@
 # RND
 
-Co-op research horror (working title). Players are researchers collecting evidence on unknown
-entities and selling it: to the government, or to the black market for more money and more risk.
+Co-op research horror (working title). Players are scientists researching and testing unknown
+entities, and trying to get out alive.
 
 Godot 4.7 (.NET / C#), Jolt physics, ENet networking for now.
 

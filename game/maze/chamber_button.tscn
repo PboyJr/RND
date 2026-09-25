@@ -1,0 +1,67 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://maze/ChamberButton.cs" id="1_button"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_pedestal"]
+size = Vector3(0.35, 1, 0.35)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pedestal"]
+albedo_color = Color(0.35, 0.37, 0.4, 1)
+roughness = 0.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_pedestal"]
+material = SubResource("StandardMaterial3D_pedestal")
+size = Vector3(0.35, 1, 0.35)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cap"]
+resource_local_to_scene = true
+albedo_color = Color(0.85, 0.87, 0.9, 1)
+roughness = 0.4
+emission_enabled = true
+emission = Color(1, 0.35, 0.1, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cap"]
+material = SubResource("StandardMaterial3D_cap")
+top_radius = 0.13
+bottom_radius = 0.13
+height = 0.08
+radial_segments = 24
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
+radius = 0.4
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_button"]
+properties/0/path = NodePath(".:Pressed")
+properties/0/spawn = false
+properties/0/replication_mode = 2
+properties/1/path = NodePath(".:Presses")
+properties/1/spawn = false
+properties/1/replication_mode = 2
+
+[node name="ChamberButton" type="StaticBody3D"]
+script = ExtResource("1_button")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_pedestal")
+
+[node name="Pedestal" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pedestal")
+
+[node name="Cap" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03, 0)
+mesh = SubResource("CylinderMesh_cap")
+
+[node name="HitZone" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 0)
+collision_layer = 0
+collision_mask = 4
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="HitZone"]
+shape = SubResource("SphereShape3D_hit")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_button")

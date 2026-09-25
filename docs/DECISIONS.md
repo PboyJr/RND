@@ -511,6 +511,62 @@ retuned without migrating saves.
 Steam id) and the host reports results to it; the format stays the same. Steam Cloud alone
 wouldn't fix this, since a synced file is still editable.
 
+## 2026-09-25: Pressure plates are weighed by the host; doors follow them on every peer
+
+**Decision:**
+- `maze/PressurePlate.cs` (an `Area3D`, scene `maze/pressure_plate.tscn`): the host adds up the
+  weight on it every physics step (players count as 60, `PhysicsProp`s count their mass unless
+  someone is carrying them) and sets `Pressed` when it reaches `MinWeight` (30). Only `Pressed`
+  is replicated.
+- `maze/ChamberDoor.cs` (an `AnimatableBody3D`, scene `maze/chamber_door.tscn`) is open while
+  **all** of its `Plates` are pressed. Every peer works this out from the replicated plates and
+  slides its own copy, so the door needs no synchronizer. It pushes players and props out of the
+  way as it closes. The host plays the `Impact` sound when it starts moving (no new recipe).
+- Doors sit **outside** the `Navigation` node, so the navmesh is baked as if they were open.
+
+**Why:** weight, rather than "anything touching it", makes the heavy case the weighted cube for
+free, and lets players improvise (a pile of crates works). Deriving the door from the plates
+keeps one piece of replicated state per puzzle piece.
+
+**Update, same day: timed buttons, and doors don't crush.**
+- Anything that opens a door implements `ISwitch` (`bool Pressed`), next to `ChamberDoor`. The
+  door's list is `Switches`, with `OpensOnAny` for "any one of them" (default: all of them).
+- `maze/ChamberButton.cs` (a `StaticBody3D` on the World layer, so the grab ray hits it): the
+  player's [E] sends `RequestPress` (the host checks the player is alive and within 3 m), and a
+  `PhysicsProp` hitting its `HitZone` at 2 m/s or faster presses it too. The host keeps the
+  release time and replicates `Pressed` plus a `Presses` counter, so every peer restarts the
+  glow countdown on a re-press without replicating a timer.
+- `Player.UpdateFilterSwap` became `UpdateInteract`: a button you're looking at comes first, then
+  the filter.
+- **A closing door waits** while `TestMove` finds a player or prop in its way (its collision
+  mask exists only for that test). That means no crushing, and a crate jams it open. Opening
+  doors don't check; they only move into walls.
+
+## 2026-09-25: A maze run is a node on Main that swaps chamber levels; revive is per level
+
+**Decision:**
+- `maze/MazeRun.cs` sits on `Main` (`Main/Run`), so it survives level changes. On the host it
+  loads a chamber through `Main.ChangeLevel` (the `LevelSpawner` copies it to clients like any
+  level) and moves on once `ChamberExit.Current` is complete. It **fails the run when every
+  player is dead at once** and passes it after `Length` chambers. It tells everyone its state
+  (active, chamber, length, result) with one reliable RPC, re-sent to late joiners. The menu shows
+  any level in `Chambers` as "Maze run".
+- Each chamber is its own level, loaded fresh (a lift between tests, in Portal terms). It's
+  simpler than stitching rooms into one level, and it's what "chambers are ordinary levels"
+  already gave us. Every player starts each chamber at full health.
+- `Level.TimedRespawn` (off in chambers) decides whether the dead come back on the 8 s timer.
+  Otherwise the owner holds [E] near a downed teammate. Once the hold finishes, it sends
+  `RequestRevive` to the host (alive, within 3 m) → `Health.ReviveTo(50)`. **A full-health revive is
+  a respawn** (spawn point, fresh filter); anything less leaves you where you fell. That is how
+  `Player.OnRevived` tells them apart.
+- `Health.Revive()` stays argument-free, with `ReviveTo(amount)` beside it: GDScript can't use
+  a C# default argument, so `Revive(float amount = -1)` broke the smoke test's calls.
+- **The smoke test now fails on any logged error** (`OS.add_logger`). Before, a script error or
+  C# exception only aborted the function it was in, and the run could still say PASS. That's
+  exactly what happened to the `Revive()` calls above.
+
+**Why:** the smallest loop that has an end state and a way to lose, built from what exists.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -567,6 +623,24 @@ Things the prototype does on purpose that we'll need to revisit:
   so a late joiner's clock is off and they never see the test as passed. Sync the chamber state
   once chambers chain into a maze.
 - Passing a chamber doesn't lead anywhere yet: there's one chamber and no next one.
+- The navmesh treats chamber doors as always open, so an enemy would path into a closed door and
+  rely on stuck recovery. No enemy is in a chamber yet; before "the evil guy as a variable",
+  make the AI treat a closed door as a wall (a nav link or a region that's switched off with the door).
+- Plates, buttons and doors are only smoke-tested offline. `Pressed` replicates like any other
+  synced property, but the network roles still run on the test level, not the chamber.
+- Doors and buttons have no sounds of their own (both reuse `Impact`), no ticking while a button
+  runs down, and doors have no visible frame or track.
+- Each peer runs its own door, so a jam can differ slightly between peers for a moment: the
+  host's crate is in the doorway before the client's copy of it is. It settles once the crate stops.
+- The acid flask can't press a button (it's a projectile, not a `PhysicsProp`).
+- A maze run over the network (changing chambers mid-session) isn't smoke-tested: the network
+  roles still play the test level. Offline, a whole run (pass, restart, fail) is tested, and so is
+  a revive over the network.
+- The hold-[E] revive (aiming, progress) isn't tested; the test sends `RequestRevive` directly.
+- With no enemy in chambers yet, nothing can actually down you there, so a run can't really be
+  lost in play yet.
+- The run picks chambers at random from a pool of one, and restarts on its own after the result
+  screen (no lobby, no reward yet).
 - Telling mental from physical drops on clients relies on the health synchronizer sending `Mental`
   and `Current` in the same update, `Mental` first. If a drop ever mixes both in one update, only
   the physical part counts as a hit, which is right; if they ever arrive in separate updates, a

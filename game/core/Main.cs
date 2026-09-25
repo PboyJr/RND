@@ -1,5 +1,6 @@
 using System.Linq;
 using Godot;
+using RND.Maze;
 using RND.UI;
 
 namespace RND.Core;
@@ -16,13 +17,16 @@ public partial class Main : Node
 	private Node _levelRoot;
 	private MainMenu _menu;
 	private Hud _hud;
+	private MazeRun _run;
 
 	public override void _Ready()
 	{
 		_levelRoot = GetNode("Level");
 		_menu = GetNode<MainMenu>("UI/MainMenu");
 		_hud = GetNode<Hud>("UI/Hud");
-		_menu.SetLevels(Levels.Select(level => level.ResourcePath.GetFile().GetBaseName().Capitalize()));
+		_run = GetNode<MazeRun>("Run");
+		// A maze chamber in the list means "start a maze run" rather than that one chamber.
+		_menu.SetLevels(Levels.Select(level => _run.Has(level) ? "Maze run" : level.ResourcePath.GetFile().GetBaseName().Capitalize()));
 
 		Network.Instance.SessionStarted += OnSessionStarted;
 		Network.Instance.SessionEnded += OnSessionEnded;
@@ -33,18 +37,28 @@ public partial class Main : Node
 		_menu.Hide();
 		_hud.Open();
 
-		if (Multiplayer.IsServer())
-			Callable.From(() => ChangeLevel(Levels[_menu.SelectedLevel])).CallDeferred();
+		if (!Multiplayer.IsServer())
+			return;
+
+		PackedScene picked = Levels[_menu.SelectedLevel];
+		Callable.From(() =>
+		{
+			if (_run.Has(picked))
+				_run.Start();
+			else
+				ChangeLevel(picked);
+		}).CallDeferred();
 	}
 
 	private void OnSessionEnded(string reason)
 	{
+		_run.Stop();
 		ClearLevel();
 		_hud.Close();
 		_menu.Open(reason);
 	}
 
-	private void ChangeLevel(PackedScene level)
+	public void ChangeLevel(PackedScene level)
 	{
 		ClearLevel();
 		_levelRoot.AddChild(level.Instantiate());

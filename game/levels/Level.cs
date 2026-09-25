@@ -21,6 +21,8 @@ public partial class Level : Node3D
 	[Export] public PackedScene PlayerScene { get; set; }
 	[Export] public PackedScene EnemyScene { get; set; }
 	[Export] public float EnemyRespawnDelay { get; set; } = 12f;
+	// Dead players come back on a timer. Off (maze chambers): they stay down until a teammate revives them.
+	[Export] public bool TimedRespawn { get; set; } = true;
 
 	public Effects Effects { get; private set; }
 

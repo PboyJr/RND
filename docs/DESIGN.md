@@ -19,9 +19,13 @@ falling back to the script.
 
 ## Pitch
 
-Co-op horror in the vein of R.E.P.O. You're a team of researchers sent into places where unknown
-entities live. Collect evidence, data and specimens, get out alive, and sell what you found:
-to the government, or to the black market for more money and a chance of getting caught.
+Co-op horror in the vein of R.E.P.O. You're a team of scientists sent into places where unknown
+entities live to **research and test** them: collect data and specimens, run tests, and get out
+alive.
+
+(Changed 2026-09-25: this replaces "sell what you found to the government or the black market".
+`Open`: whether selling survives in some form, and what research earns you. See
+[Selling](#selling-open).)
 
 Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sans, muahahaha).
 
@@ -85,8 +89,8 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
   ending means starting over. `Idea`: what's lost is what the rat had (gear and loot it was
   carrying, maybe per-round buffs); what's kept is what's in your head (the research tree,
   upgrades, character level). This also fits persistent characters.
-- `Open`: how this fits the existing pitch (researchers selling evidence to the government or the
-  black market). Who is buying, and who are the "entities" to a rat?
+- `Open`: who are the "entities" to a rat? (The pitch is now scientists doing research and
+  testing, which fits the lore better than selling did.)
 - `Open`: how psychosis builds up (time in the maze only, or other triggers too?), what it does
   besides the rat visuals, and how you get rid of it.
 
@@ -121,9 +125,9 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
 ## Core loop (`Leaning`)
 
 1. Deploy into a site
-2. Collect research (evidence, data, specimens) while dealing with entities
+2. Research and test (collect data and specimens, run tests) while dealing with entities
 3. Extract
-4. Sell: government or black market
+4. Hand in the research (`Open`: what it earns, and whether selling is part of it)
 5. Between rounds: upgrades, research tree, crate opening
 
 This is the loop for REPO-style retrieval. That may be just one of several modes (below).
@@ -131,6 +135,9 @@ This is the loop for REPO-style retrieval. That may be just one of several modes
 ## Game modes (`Idea`, 2026-09-25)
 
 The game could have multiple modes, with REPO-style retrieval as one of them:
+
+**The maze is built first** (`Decided`, 2026-09-25): it's the first mode that becomes a whole
+game loop, a **run** of chambers that you pass or fail (see ROADMAP M8). Retrieval comes after.
 
 1. **REPO-style retrieval**: the core loop above.
 2. **Maze solving**
@@ -153,8 +160,20 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
   are huge, a quiet hint at the truth (see [Lore](#lore-idea-2026-09-25)).
 - **Puzzle pieces, built from what we already have:**
   - **Pressure plates** held down by props (the heavy case is our weighted cube) or by standing
-    on them. Doors stay open only while the plate is held.
-  - **Buttons** that open a door for a few seconds, so someone has to run or throw.
+    on them. Doors stay open only while the plate is held. **In the prototype** (2026-09-25): a
+    plate is pressed by **weight**, at least 30 (a player counts as 60, props by mass, carried
+    props not at all). So a player or the heavy case holds it, a jar doesn't, and a pile of four
+    crates does. A door can need several plates at once. The first chamber's exit door has one plate,
+    and since everyone has to reach the exit, someone has to bring the case.
+  - **Buttons** that open a door for a few seconds, so someone has to run or throw. **In the
+    prototype** (2026-09-25): a button on a pedestal, pressed with [E] or by **hitting it with a
+    thrown prop**. It stays down for 5 s, and its glow fades from blue to orange as time runs
+    out. Pressing it again restarts the clock. A door can open on *any* of its switches (a button
+    on each side) or need *all* of them (plates).
+  - **Doors never close on anyone:** a player or prop in the doorway stops the door, so you can't
+    get crushed, and **a crate can jam a door open** (on purpose: improvising is the point).
+    In the first chamber, the heavy case sits in a closet behind a button door, with a second
+    button inside so you can't be shut in.
   - **Co-op locks** (Portal 2 co-op): two plates at once, a player holding a door while another
     passes, throwing a filter or crate across a gap to a teammate.
   - **The acid flask** melts certain panels, grates or seals: a Scientist-kit puzzle piece.
@@ -206,9 +225,12 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
 - `Open`: do props have value and fragility, losing money when they hit something too hard like in REPO?
 - `Open`: is there also non-physical evidence (photos, recordings, readings, data)?
 
-### Selling: government vs black market (`Idea`)
+### Selling (`Open`)
 
-- The black market pays more, but you can get caught. The penalty is a **$ fine**.
+The pitch dropped selling on 2026-09-25 (it's now research and testing). Undecided whether
+selling stays at all. The earlier idea, if it does:
+
+- Government vs black market: the black market pays more, but you can get caught. The penalty is a **$ fine**.
 - The goal is a risk/reward "one more sale" loop.
 - `Open`: how is getting caught decided? Flat chance, a heat meter that builds with repeated
   sales, or something tied to what you're selling?
@@ -304,9 +326,15 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 
 ### Health, damage, death (`Leaning`)
 
-- Players: **100 HP**. Death is a placeholder: you fall over, then **respawn at a spawn point
-  after 8 s** at full health, with a fresh mask and filter. `Open`: REPO-style revive-by-teammate
-  instead? Does death cost money or research? (The upload lore suggests death loses the rat's
+- Players: **100 HP**.
+- **In the maze: teammate revive** (`Decided`, 2026-09-25). When you die you're down, not
+  respawning. A teammate holds [E] on you for 3 s and you're back at **50 health**, where you
+  fell, with the filter you had. **If everyone is down at once, the run fails.** Downed players
+  who get left behind come back when the next chamber loads (every chamber starts everyone
+  fresh, for now). `Open`: should health and filter carry over between chambers (attrition)?
+- **In the test level** (the sandbox): still the placeholder, **respawn after 8 s** at full
+  health, with a fresh mask and filter.
+- `Open`: does death cost money or research? (The upload lore suggests death loses the rat's
   stuff but not your upgrades, see Lore.)
 - Hits flash your body for everyone else. For you, they crack your visor (see below).
 
@@ -333,6 +361,11 @@ it coming from the sides.
 - **Nothing on the visor flashes on and off** (2026-09-25). Warnings ease instead: the filter gauge
   fades as it runs low (the spent warning is back at full strength), mental damage browns the HUD
   out, and running out of gas closes in a steady vignette.
+- **HUD in the black rim** (`Idea`, 2026-09-25): move HUD elements off the glass and onto the
+  rubber rim, like readouts built into the mask frame. Would stay code-driven (the rim is
+  procedural and sways), not PNG overlays. Open: how much rim there is varies with aspect ratio
+  (almost none at the sides on 4:3), so the corners and around the nose cup are the reliable spots;
+  and should rim readouts keep the projected-glass effects or look like physical parts (dim LEDs)?
 - Outside the mask, crisp and **deliberately unstyled**: a debug health bar (Godot's default
   progress bar, showing %), a purple debug bar for mental damage and a filter readout. Remove these once the cracks read well in
   playtests.
@@ -468,7 +501,8 @@ filter, see Lore → "The mask is the lie".)
 
 - [ ] Value / fragility on props?
 - [ ] Non-physical evidence types?
-- [ ] Black market: how you get caught, who pays, round-level consequences?
+- [ ] Selling: does it stay now that the pitch is research and testing? What does research earn you?
+  If the black market stays: how you get caught, who pays, round-level consequences?
 - [ ] Character abilities: what they are, the decay curve and floor, and the retraining rate `K`?
   (Storage and "time" are decided: see Persistent characters → How player data is stored.)
 - [ ] Upgrades: per character or per profile?
@@ -476,7 +510,7 @@ filter, see Lore → "The mask is the lie".)
 - [ ] Building: in or out?
 - [ ] Real title?
 - [ ] Acid friendly fire? Lingering acid puddles?
-- [ ] Death: timed respawn (prototype) vs. teammate revive vs. out for the round?
+- [x] Death: teammate revive in the maze; everyone down fails the run (decided 2026-09-25)
 - [ ] Other archetypes and their kits?
 - [ ] The evil guy's lore, and whether it can be researched
 - [ ] Filter tuning: is 180 s right? Should swapping take time? Where do spares come from in real levels?
@@ -484,4 +518,3 @@ filter, see Lore → "The mask is the lie".)
 - [ ] Game modes: which ones, and what does each play like? (see Game modes)
 - [ ] Dying: which upgrades do you keep, and what goes down with the rat?
 - [ ] Mental damage: does the HUD corruption read clearly enough in play? (see Lore → "The mask is the lie")
-- [ ] Rat lore: does it replace or reframe the "researchers selling evidence" pitch? (see Lore)

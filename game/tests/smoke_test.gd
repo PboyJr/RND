@@ -16,6 +16,9 @@ const SCENES := [
 	"res://core/main.tscn",
 	"res://levels/test_level.tscn",
 	"res://maze/test_chamber.tscn",
+	"res://maze/pressure_plate.tscn",
+	"res://maze/chamber_door.tscn",
+	"res://maze/chamber_button.tscn",
 	"res://players/player.tscn",
 	"res://props/crate.tscn",
 	"res://props/crate_large.tscn",
@@ -33,9 +36,28 @@ var _failures := PackedStringArray()
 var _finished := false
 var _main: Node
 var _network: Node
+var _errors := ErrorCatcher.new()
+
+
+# A script error or C# exception only aborts the function it happens in, so the run carries on and
+# could still pass. This collects every error Godot logs, and _finish fails the run on any of them.
+class ErrorCatcher extends Logger:
+	var messages := PackedStringArray()
+	var _mutex := Mutex.new()
+
+	func _log_error(function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, _backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type == ERROR_TYPE_WARNING:
+			return
+		_mutex.lock()
+		messages.append("%s (%s:%d in %s)" % [rationale if rationale else code, file, line, function])
+		_mutex.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
 
 
 func _ready() -> void:
+	OS.add_logger(_errors)
 	_role = _arg("role", "scenes")
 	_network = get_node("/root/Network")
 	get_tree().create_timer(TIMEOUT).timeout.connect(func(): _fail("timed out"); _finish())
@@ -84,6 +106,9 @@ func _run_scenes() -> void:
 		await _run_offline_filter(level, player)
 		await _run_offline_liquid(level)
 	level.queue_free()
+	await _frames(2)
+	await _run_offline_chamber()
+	await _run_offline_run()
 
 
 # Acid flask vs. evil guy, evil guy vs. player, death and respawn, all offline as the host.
@@ -345,10 +370,118 @@ func _run_offline_chamber() -> void:
 		_check(player.is_on_floor(), "chamber: player isn't standing on the floor")
 		_check(player.global_position.distance_to(exit.global_position) > 10.0, "chamber: player spawned near the exit")
 		_check(not exit.IsComplete, "chamber: test passed before anyone reached the exit")
+		await _run_offline_plate(level, player)
+		await _run_offline_button(level, player)
 		player.global_position = exit.global_position - Vector3(0, 1.4, 0)
 		_check(await _wait_until(func(): return exit.IsComplete, 2.0), "chamber: standing in the exit didn't pass the test")
 	level.queue_free()
 	await _frames(2)
+
+
+# The exit door stays open only while the plate is weighed down: a player can, and so can the heavy case.
+func _run_offline_plate(level: Node, player: Node3D) -> void:
+	var plate := level.get_node("Plate") as Node3D
+	var door := level.get_node("ExitDoor") as Node3D
+	var case := level.get_node("Props/CaseA") as RigidBody3D
+	var closed := door.position
+	_check(not plate.Pressed and not door.IsOpen, "plate: pressed / door open with nothing on it")
+	var start := player.global_position
+	player.global_position = plate.global_position + Vector3(0, 0.1, 0)
+	_check(await _wait_until(func(): return plate.Pressed and door.IsOpen, 1.0), "plate: standing on it didn't open the door")
+	player.global_position = start
+	_check(await _wait_until(func(): return not plate.Pressed and not door.IsOpen, 1.0), "plate: stepping off didn't close the door")
+	case.global_position = plate.global_position + Vector3(0, 0.7, 0)
+	_check(await _wait_until(func(): return plate.Pressed, 2.0), "plate: the heavy case didn't press it")
+	_check(await _wait_until(func(): return door.position.distance_to(closed) > 3.0, 2.0), "plate: door didn't slide open (moved %.2f m)" % door.position.distance_to(closed))
+
+
+# The closet button: [E] within reach opens the door for a while, a thrown crate presses it too, and a
+# crate in the doorway stops the door closing.
+func _run_offline_button(level: Node, player: Node3D) -> void:
+	var button := level.get_node("ButtonOutside") as Node3D
+	var door := level.get_node("ClosetDoor") as Node3D
+	var crate := level.get_node("Props/CrateA") as RigidBody3D
+	var closed := door.position
+	button.OpenSeconds = 1.5
+	var start := player.global_position
+
+	player.global_position = button.global_position + Vector3(0, 0.05, 5.0)
+	await _frames(2)
+	button.RequestPress()
+	await _frames(2)
+	_check(not button.Pressed, "button: pressed from 5 m away")
+
+	player.global_position = button.global_position + Vector3(0, 0.05, 1.0)
+	await _frames(2)
+	button.RequestPress()
+	_check(await _wait_until(func(): return button.Pressed and door.IsOpen, 0.5), "button: [E] within reach didn't press it")
+	_check(await _wait_until(func(): return door.position.distance_to(closed) > 3.0, 2.0), "button: closet door didn't slide open")
+	_check(await _wait_until(func(): return not button.Pressed, 1.5), "button: never popped back up")
+	_check(await _wait_until(func(): return door.position.distance_to(closed) < 0.01, 2.0), "button: closet door didn't close again")
+	player.global_position = start
+
+	crate.global_position = button.global_position + Vector3(1.5, 1.05, 0)
+	crate.linear_velocity = Vector3(-6, 0, 0)
+	_check(await _wait_until(func(): return button.Pressed, 1.0), "button: a thrown crate didn't press it")
+	_check(await _wait_until(func(): return door.position.distance_to(closed) > 3.0, 2.0), "button: door didn't open for the thrown crate")
+
+	crate.global_position = closed + Vector3(0, -1.2, 0) # in the doorway, on the floor (the level sits at the origin)
+	crate.linear_velocity = Vector3.ZERO
+	await _wait_until(func(): return not button.Pressed, 2.0)
+	await _seconds(1.5)
+	_check(door.position.distance_to(closed) > 0.5, "button: door closed on a crate in the doorway (%.2f m from shut)" % door.position.distance_to(closed))
+	crate.global_position = Vector3(2.5, 0.3, 3)
+	_check(await _wait_until(func(): return door.position.distance_to(closed) < 0.01, 2.0), "button: door didn't close once the crate was moved")
+
+
+# A maze run, offline: passing a chamber loads the next, passing the last passes the run, a new run
+# starts after the result, and everyone going down fails it (no timed respawn in chambers).
+func _run_offline_run() -> void:
+	_start_main()
+	var run := _main.get_node("Run")
+	run.Length = 2
+	run.PauseSeconds = 0.2
+	run.ResultSeconds = 0.5
+	run.Start()
+	for test in 2:
+		var loaded := await _wait_until(func(): return run.Chamber == test and _players() != null and _players().has_node("1"), 3.0)
+		if not _check(loaded, "run: chamber %d never loaded" % (test + 1)):
+			break
+		await _seconds(0.3)
+		_players().get_node("1").global_position = _level().get_node("Exit").global_position - Vector3(0, 1.4, 0)
+	_check(await _wait_until(func(): return run.Result == 1, 3.0), "run: passing the last chamber didn't pass the run")
+	_check(await _wait_until(func(): return run.Result == 0 and run.Chamber == 0, 3.0), "run: no new run after the result")
+	await _wait_until(func(): return _players() != null and _players().has_node("1"), 3.0)
+	await _seconds(0.3)
+	var health := _players().get_node("1").get_node("Health")
+	health.TakeDamage(99999.0, 0)
+	_check(await _wait_until(func(): return run.Result == 2, 2.0), "run: everyone down didn't fail the run")
+	_check(health.IsDead, "run: a downed player came back on a timer in a chamber")
+	_main.queue_free()
+	_main = null
+	await _frames(2)
+
+
+# The host's player lies dead (see _run_host). A teammate next to it revives it at half health where it
+# fell; from across the room, nothing happens.
+func _run_network_revive(me: Node3D) -> void:
+	var host_player := _players().get_node("1") as Node3D
+	var health := host_player.get_node("Health")
+	if not _check(health.IsDead, "revive: the host's player should be lying dead"):
+		return
+	if me.global_position.distance_to(host_player.global_position) > 4.0:
+		host_player.rpc_id(1, "RequestRevive")
+		await _seconds(0.5)
+		_check(health.IsDead, "revive: revived from %.1f m away" % me.global_position.distance_to(host_player.global_position))
+	var fell_at := host_player.global_position
+	me.global_position = fell_at + Vector3(0, 0.05, 1.2)
+	await _seconds(0.3) # let the host see us next to it
+	host_player.rpc_id(1, "RequestRevive")
+	_check(await _wait_until(func(): return not health.IsDead, 2.0), "revive: standing next to it didn't revive the host's player")
+	_check(absf(health.Current - 50.0) < 0.1, "revive: came back with %.0f health, not 50" % health.Current)
+	await _seconds(0.3)
+	_check(host_player.global_position.distance_to(fell_at) < 1.0, "revive: the revived player was moved to a spawn point")
+	_log("revive: host's player back at %.0f health where it fell" % health.Current)
 
 
 # Kills whatever's there and waits for the level to spawn a fresh, calm evil guy.
@@ -430,6 +563,7 @@ func _run_client() -> void:
 
 	await _run_network_filter(me)
 	await _run_network_combat(me, head)
+	await _run_network_revive(me)
 
 	_network.Leave()
 	await _frames(5)
@@ -693,6 +827,9 @@ func _finish() -> void:
 	if _finished:
 		return
 	_finished = true
+	OS.remove_logger(_errors)
+	for error in _errors.messages:
+		_fail("error logged: " + error)
 	if _failures.is_empty():
 		print("SMOKE PASS (%s)" % _role)
 		get_tree().quit(0)

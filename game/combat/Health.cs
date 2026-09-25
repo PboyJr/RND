@@ -77,14 +77,17 @@ public partial class Health : Node
 		SetCurrent(Current - dealt, 0);
 	}
 
-	/// <summary>Host only; ignored elsewhere.</summary>
-	public void Revive()
+	/// <summary>Host only; ignored elsewhere. Back to full health.</summary>
+	public void Revive() => ReviveTo(MaxHealth);
+
+	/// <summary>Host only; ignored elsewhere. Back with `amount` health (a teammate's revive).</summary>
+	public void ReviveTo(float amount)
 	{
 		if (!Multiplayer.IsServer())
 			return;
 
 		Mental = 0f;
-		SetCurrent(MaxHealth, 0);
+		SetCurrent(Mathf.Min(amount, MaxHealth), 0);
 	}
 
 	private void SetCurrent(float value, int sourcePeerId)

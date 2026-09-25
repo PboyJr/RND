@@ -1,6 +1,8 @@
 using System.Linq;
 using Godot;
 using RND.Core;
+using RND.Levels;
+using RND.Maze;
 using RND.Players;
 using RND.Vfx;
 
@@ -94,8 +96,14 @@ public partial class Hud : Control
 		if (local.IsDead && !_wasDead)
 			_respawnAt = Now + local.RespawnDelay;
 		_wasDead = local.IsDead;
-		_deathLabel.Visible = local.IsDead;
-		if (local.IsDead)
+		var run = MazeRun.Current;
+		_deathLabel.Visible = local.IsDead || run is { Active: true, Result: not RunResult.None };
+		if (run is { Active: true, Result: not RunResult.None })
+			_deathLabel.Text = (run.Result == RunResult.Passed ? "RUN COMPLETE" : "ALL SUBJECTS DOWN")
+				+ $"\nTests passed: {run.Chamber + (run.Result == RunResult.Passed ? 1 : 0)} of {run.Length}\nNext run starting…";
+		else if (local.IsDead && Level.Current is { TimedRespawn: false })
+			_deathLabel.Text = "You're down.\nA teammate can revive you (hold E).";
+		else if (local.IsDead)
 			_deathLabel.Text = $"You died.\nRespawning in {Mathf.CeilToInt(Mathf.Max(0.0, _respawnAt - Now))}…";
 	}
 
