@@ -20,6 +20,13 @@ public partial class Hud : Control
 
 	// Key, label, and the bool property it flips. Defaults are those properties in the Inspector.
 	private (Key Key, string Label, GodotObject Target, string Property)[] _viewToggles;
+
+	// F7: mutes everything (the Master bus). Debug only, so not saved.
+	public bool Sound
+	{
+		get => !AudioServer.IsBusMute(0);
+		set => AudioServer.SetBusMute(0, !value);
+	}
 	private Label _viewTogglesList;
 	private double _viewTogglesShownUntil;
 
@@ -50,6 +57,7 @@ public partial class Hud : Control
 			(Key.F4, "film grain", Visor, nameof(Visor.Grain)),
 			(Key.F5, "colour crush", Visor, nameof(Visor.ColourCrush)),
 			(Key.F6, "lens (curve, edge blur, fringe)", Visor, nameof(Visor.Lens)),
+			(Key.F7, "sound", this, nameof(Sound)),
 		};
 
 		GetNode<Button>("%Resume").Pressed += () => SetPaused(false);

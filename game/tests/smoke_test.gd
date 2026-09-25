@@ -384,6 +384,10 @@ func _run_offline_chamber() -> void:
 	await _seconds(0.5)
 	_check(level.get_node("Enemies").get_child_count() == 0, "chamber: the evil guy was there from the start")
 	_check(await _wait_until(func(): return level.get_node("Enemies").get_child_count() == 1, 2.0), "chamber: the evil guy was never released")
+	# Left alone he wanders, and only ever to spots he can walk to (not the roof over the chamber).
+	var agent := level.get_node("Enemies").get_child(0).get_node("NavigationAgent3D") as NavigationAgent3D
+	var heading_nowhere := await _wait_until(func(): return not _can_path(level, agent.get_parent().global_position, agent.target_position), 6.0)
+	_check(not heading_nowhere, "chamber: the evil guy picked a spot he can't reach (%s)" % agent.target_position)
 	level.queue_free()
 	await _frames(2)
 

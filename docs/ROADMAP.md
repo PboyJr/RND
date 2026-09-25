@@ -90,7 +90,7 @@ Goal: sound sells the mask as much as the visor does.
       refilling over its recharge (now 5 s), visible to everyone; one shared flask model scene
 - [x] Thinner outlines (1 px instead of 2), width / colour adjustable in the Inspector
 - [x] Debug view hotkeys F2–F6 (cel shading, outlines, grain, colour crush, lens), defaults in the
-      Inspector
+      Inspector; F7 mutes all sound
 - [x] Procedural cracks: every hit fractures the glass on the side it came from (crushed spot,
       spider-web shards, long bending cracks), sized by the hit; smoke-checked in the capture
 - [x] Cel shading keeps the room as dark as without it (it was 89% brighter). The capture test

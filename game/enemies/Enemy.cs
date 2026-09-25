@@ -426,8 +426,20 @@ public partial class Enemy : CharacterBody3D
 		return Mathf.Abs(offset.Y) < AttackHeightTolerance && new Vector2(offset.X, offset.Z).Length() < range;
 	}
 
-	private Vector3 RandomReachablePoint(Vector3 centre, float radius) =>
-		SnapToNavmesh(centre + new Vector3(_rng.RandfRange(-1f, 1f), 0f, _rng.RandfRange(-1f, 1f)) * radius);
+	// The navmesh also covers places it can't walk to (the roof over a chamber, a room behind a shut
+	// door), and a random spot near a wall often snaps there. Only take spots its path actually reaches.
+	private Vector3 RandomReachablePoint(Vector3 centre, float radius)
+	{
+		Rid map = GetWorld3D().NavigationMap;
+		for (int attempt = 0; attempt < 8; attempt++)
+		{
+			Vector3 point = SnapToNavmesh(centre + new Vector3(_rng.RandfRange(-1f, 1f), 0f, _rng.RandfRange(-1f, 1f)) * radius);
+			Vector3[] path = NavigationServer3D.MapGetPath(map, GlobalPosition, point, true);
+			if (path.Length > 0 && path[^1].DistanceTo(point) < 0.5f)
+				return point;
+		}
+		return GlobalPosition; // nowhere to go: stays put, and picks again next time it's idle
+	}
 
 	// The navmesh point on the surface under a position. A plain closest-point query can pick the floor
 	// beside a platform instead of its top near the edge; probing a vertical segment hits the surface

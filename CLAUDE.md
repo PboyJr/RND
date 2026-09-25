@@ -48,7 +48,7 @@ questions, next steps), update it too, bump its date, and republish it.
   the dev machine: it's 7.1 surround, and the recorder misses non-positional sound.
 - Atmosphere-only sounds (ambience) go through `audio/Ambience.cs`, not `EmitSound`.
 - Materials: author ordinary `StandardMaterial3D`s. `vfx/ToonStyle.cs` turns opaque ones into the
-  cel-shaded look at runtime (F2 toggles it; the F2–F6 look switches are one table in `ui/Hud.cs`),
+  cel-shaded look at runtime (F2 toggles it; the F2–F7 debug switches (look, plus F7 sound) are one table in `ui/Hud.cs`),
   and animating the original's albedo or emission still works. Liquids: a closed `Liquid` mesh + `vfx/Liquid.cs` + `vfx/liquid.gdshader`. A model used
   in several places (prop, in hand, thrown) is one scene in `models/`, instanced by each.
 - Enemies only act on what they perceive (sight cone, hearing, memory). Don't give AI direct

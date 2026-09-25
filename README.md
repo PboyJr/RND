@@ -83,6 +83,7 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | LMB with the acid flask | Throw it (5 s recharge; the flask in your hand refills) |
 | E on (or holding) a spare filter | Screw it onto your mask |
 | F2 – F6 | Debug view switches, to compare looks: cel shading, outlines, film grain, colour crush, lens (glass curve, edge blur, fringe). Pressing one lists what's on, top right |
+| F7 | Mute / unmute all sound (debug) |
 | Esc | Free the mouse, leave session |
 
 You see everything through a gas mask. **The cracks in the glass are your health** (each hit

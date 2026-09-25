@@ -412,7 +412,8 @@ bool `[Export]` on the node that owns it (`ToonStyle.Enabled` / `Outlines`, `Vis
 `ColourCrush` / `Lens`), so **the Inspector checkboxes are the defaults**. `ui/Hud.cs` holds the
 key → property table, and after each press it lists what's on (top right, for 3 s). The visor
 shader skips grain / crush / lens with `grain_on` / `crush_on` / `lens_on`. Breath fog, cracks and
-choking can't be switched off: they're gameplay feedback.
+choking can't be switched off: they're gameplay feedback. (2026-09-25: F7 mutes all sound, via a
+`Hud.Sound` property over the Master bus, for testing without the noise. Not saved.)
 
 **Why:** the user wanted to compare effects. Grain and colour crush look good on the smooth
 look but choppy over cel shading. Adding a new switch is one line in the table.
@@ -590,6 +591,20 @@ unreachable really is unreachable: he waits at the door instead of walking into 
 with the door shut (none) and fully open (found). Forcing the link always on makes the "shut"
 check fail, so it's not passing by accident.
 
+## 2026-09-25: The evil guy only wanders to spots he can reach
+
+**Decision:** `Enemy.RandomReachablePoint` (wander and search spots) samples up to 8 spots and
+keeps the first one whose navmesh path actually ends there. If none does, it stays put and tries
+again next time it's idle.
+
+**Why:** the navmesh also covers unreachable surfaces, such as the roof on top of a chamber's
+shell (5 m up) and tabletops. A random spot near a wall often snapped up there. In the test
+chamber he spawns in a corner, so most picks were unreachable, and he stood still after his
+release. Checking the path is the general fix: it also covers rooms behind shut doors.
+
+**How we verified it:** the smoke test watches the released evil guy for 6 s and fails if he
+ever heads for a spot he can't reach. Against the old code it fails with a spot on the roof.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -615,8 +630,9 @@ Things the prototype does on purpose that we'll need to revisit:
   collapsing floor) will need a re-bake plus fresh links.
 - It doesn't plan around props, it just shoves them. A pile of heavy cases can still slow it down,
   though stuck recovery stops it wedging forever.
-- The navmesh has walkable islands on the tabletop (unreachable, harmless) and gets drop links off
-  it.
+- The navmesh has walkable islands on the tabletop and on top of each chamber's shell, and gets
+  drop links off them. They're unreachable, and the AI filters them out of its wander spots, but
+  a bake bounds box (`filter_baking_aabb`) would keep them out of the navmesh altogether.
 - `ToonStyle` keeps a toon copy of every material it has ever seen (a few per enemy respawn) and
   syncs them all every frame. Fine for a prototype; prune it if cel shading is adopted.
 - The liquid slosh only reacts to linear motion (sliding, throwing, stopping), not to spinning.
