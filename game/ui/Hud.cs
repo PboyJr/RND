@@ -106,14 +106,12 @@ public partial class Hud : Control
 
 		if (@event is not InputEventKey { Pressed: true, Echo: false } key)
 			return;
-		foreach ((Key toggleKey, _, GodotObject target, string property) in _viewToggles)
-		{
-			if (key.Keycode != toggleKey)
-				continue;
-			target.Set(property, !target.Get(property).AsBool());
-			_viewTogglesShownUntil = Now + 3.0; // flash the list so you can see what's on
-			GetViewport().SetInputAsHandled();
-		}
+		var toggle = _viewToggles.FirstOrDefault(t => t.Key == key.Keycode);
+		if (toggle.Target == null)
+			return;
+		toggle.Target.Set(toggle.Property, !toggle.Target.Get(toggle.Property).AsBool());
+		_viewTogglesShownUntil = Now + 3.0; // flash the list so you can see what's on
+		GetViewport().SetInputAsHandled();
 	}
 
 	// Multiplayer never actually pauses the game; this just frees the mouse.

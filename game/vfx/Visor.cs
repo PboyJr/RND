@@ -130,9 +130,6 @@ public partial class Visor : ColorRect
 		_lastYaw = player.Rotation.Y;
 		_lastPitch = player.SyncPitch;
 		_sway = Vector2.Zero;
-		_impacts.Clear();
-		if (_damage > 0f)
-			Crack(player, _damage); // already hurt (e.g. joined mid-fight)
 	}
 
 	private void Crack(Player player, float size)
@@ -167,15 +164,11 @@ public partial class Visor : ColorRect
 	// Cracks race out to their full size in a moment, then the shader draws them.
 	private void UploadImpacts(float dt)
 	{
-		for (int i = 0; i < MaxImpacts; i++)
+		for (int i = 0; i < _impacts.Count; i++) // the shader stops at impact_count
 		{
-			Impact impact = i < _impacts.Count ? _impacts[i] : null;
-			if (impact != null)
-				impact.Spread = Mathf.MoveToward(impact.Spread, Mathf.Min(impact.Size, 1f), dt * 2f);
-			_impactData[i * 4] = impact?.At.X ?? 0f;
-			_impactData[i * 4 + 1] = impact?.At.Y ?? 0f;
-			_impactData[i * 4 + 2] = impact?.Seed ?? 0f;
-			_impactData[i * 4 + 3] = impact?.Spread ?? 0f;
+			Impact impact = _impacts[i];
+			impact.Spread = Mathf.MoveToward(impact.Spread, Mathf.Min(impact.Size, 1f), dt * 2f);
+			new[] { impact.At.X, impact.At.Y, impact.Seed, impact.Spread }.CopyTo(_impactData, i * 4);
 		}
 		_material.SetShaderParameter("impacts", _impactData);
 		_material.SetShaderParameter("impact_count", _impacts.Count);
