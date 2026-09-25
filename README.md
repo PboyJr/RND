@@ -7,6 +7,9 @@ Godot 4.7 (.NET / C#), Jolt physics, ENet networking for now.
 
 ## Docs
 
+**Start here:** [Team handbook](docs/overview.html), the plain-English overview for everyone.
+The files below are the detailed working notes.
+
 - [Design](docs/DESIGN.md): game ideas, mechanics, open questions
 - [Decisions](docs/DECISIONS.md): tech choices and why, known limitations
 - [Roadmap](docs/ROADMAP.md): what's done, what's next

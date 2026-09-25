@@ -1,0 +1,396 @@
+<title>RND Team Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+	--bg: #edf0ee;
+	--surface: #f8faf9;
+	--ink: #17201b;
+	--muted: #56625c;
+	--line: #cdd5d0;
+	--accent: #1f7a4d;
+	--accent-soft: #d8ebdf;
+	--decided: #1f7a4d;
+	--leaning: #2f5f9e;
+	--idea: #94660f;
+	--open: #a8402f;
+	--pill-text: #ffffff;
+	--display: "Archivo Narrow", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+	--body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+	--mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		color-scheme: dark;
+		--bg: #0f1512; --surface: #161e1a; --ink: #dce6df; --muted: #93a39a; --line: #2a3530;
+		--accent: #72d69c; --accent-soft: #1c3326;
+		--decided: #4fbf80; --leaning: #7aa5e6; --idea: #d9a441; --open: #e57a66; --pill-text: #0f1512;
+	}
+}
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--bg: #0f1512; --surface: #161e1a; --ink: #dce6df; --muted: #93a39a; --line: #2a3530;
+	--accent: #72d69c; --accent-soft: #1c3326;
+	--decided: #4fbf80; --leaning: #7aa5e6; --idea: #d9a441; --open: #e57a66; --pill-text: #0f1512;
+}
+
+body { background: var(--bg); color: var(--ink); font: 17px/1.6 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px;
+	display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 56px; }
+@media (max-width: 820px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-inline: 16px; } }
+
+nav { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start;
+	display: flex; flex-direction: column; gap: 2px; font: 500 13px/1.3 var(--mono); }
+nav a { color: var(--muted); text-decoration: none; padding: 5px 8px; border-radius: 4px; }
+nav a:hover, nav a:focus-visible { color: var(--ink); background: var(--accent-soft); outline: none; }
+@media (max-width: 820px) { nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+	nav a { border: 1px solid var(--line); } }
+
+main { max-width: 68ch; display: flex; flex-direction: column; gap: 56px; }
+header { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow, .label { font: 500 12px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(44px, 8vw, 72px); font-weight: 700; letter-spacing: -.01em; }
+h1 span { color: var(--accent); }
+h2 { font-size: 30px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em;
+	padding-bottom: 10px; border-bottom: 2px solid var(--ink); }
+h3 { font-size: 21px; font-weight: 700; }
+p, ul, ol { margin: 0; }
+section { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 20px; }
+.lede { font-size: 21px; line-height: 1.5; }
+ul, ol { padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px; }
+strong { font-weight: 700; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 14px; color: var(--muted); }
+.pill { display: inline-block; font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+	padding: 5px 7px 4px; border-radius: 3px; color: var(--pill-text); white-space: nowrap; vertical-align: 2px; }
+.decided { background: var(--decided); } .leaning { background: var(--leaning); }
+.idea { background: var(--idea); } .open { background: var(--open); }
+
+.secret { border: 1px dashed var(--open); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }
+.secret .label { color: var(--open); }
+
+.loop { list-style: none; padding: 0; counter-reset: step; display: grid; gap: 10px; }
+.loop li { counter-increment: step; display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: baseline; }
+.loop li::before { content: counter(step, decimal-leading-zero); font: 500 15px var(--mono); color: var(--accent); }
+
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px 28px; }
+.features div { display: flex; flex-direction: column; gap: 8px; }
+.features ul { font-size: 16px; }
+
+.table { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; font: 500 11px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 700; white-space: nowrap; }
+kbd { font: 500 13px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 1px 5px; background: var(--bg); white-space: nowrap; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.questions { list-style: none; padding: 0; gap: 0; }
+.questions li { padding: 10px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+.questions li:last-child { border-bottom: 0; }
+@media (max-width: 480px) { .questions li { grid-template-columns: 1fr; gap: 2px; } }
+
+dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 10px 20px; }
+dt { font-weight: 700; } dd { margin: 0; }
+@media (max-width: 480px) { dl { grid-template-columns: 1fr; gap: 2px; } dd { margin-bottom: 10px; } }
+
+footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+<nav aria-label="Sections">
+	<a href="#game">The game</a>
+	<a href="#secret">The secret</a>
+	<a href="#round">A round</a>
+	<a href="#modes">Game modes</a>
+	<a href="#today">Playable today</a>
+	<a href="#controls">Controls</a>
+	<a href="#status">Where ideas stand</a>
+	<a href="#next">Deciding next</a>
+	<a href="#questions">Open questions</a>
+	<a href="#later">Later</a>
+	<a href="#rough">Rough edges</a>
+	<a href="#tech">How it's built</a>
+	<a href="#art">For artists</a>
+	<a href="#words">Glossary</a>
+</nav>
+
+<main>
+<header>
+	<p class="eyebrow">Team handbook · updated 25 Sep 2026</p>
+	<h1>RND<span>.</span></h1>
+	<p class="lede">A co-op horror game where a team of researchers goes into places where unknown creatures live, grabs evidence and specimens, gets out alive, and sells what they found.</p>
+	<p>This page is the plain-English version of where the project stands, so everyone is working from the same picture. Every idea carries a tag:</p>
+	<div class="legend">
+		<span><span class="pill decided">Decided</span> locked in</span>
+		<span><span class="pill leaning">Leaning</span> probably, not locked</span>
+		<span><span class="pill idea">Idea</span> on the table</span>
+		<span><span class="pill open">Open</span> needs an answer</span>
+	</div>
+</header>
+
+<section id="game">
+	<h2>The game in one minute</h2>
+	<p>Think <strong>R.E.P.O.</strong>: you and your friends carry fragile things through a dangerous place using real physics, and it gets chaotic. On top of that we add a gas mask you see the whole game through, a filter that runs out, and a creature that hunts you by sight and sound.</p>
+	<p>You sell what you bring back to <strong>the government</strong>, or to <strong>the black market</strong> for more money and a chance of getting fined. Between rounds you spend it on upgrades and a research tree.</p>
+	<p><strong>Our one rule <span class="pill decided">Decided</span>:</strong> make everything as smart and reactive as possible. Creatures react to what's actually happening instead of following a script. If it's a choice between a simple scripted trick and something that genuinely reacts, we pick the reactive one and fix its rough edges.</p>
+	<p class="muted">Inspired by R.E.P.O. (carrying, co-op chaos), Portal (test chambers, physics puzzles), Phasmophobia (prestige), Factorio (research tree) and crate opening.</p>
+</section>
+
+<section id="secret">
+	<h2>The secret</h2>
+	<div class="secret">
+		<p class="label">Team only · the player is never told this</p>
+		<p><strong>The scientists are rats.</strong> Each one is a rat with a human brain uploaded into it. The real scientists are testing whether humans in rat bodies beat ordinary rats, which is why the game has different modes: they're different test environments. <span class="pill idea">Idea</span></p>
+		<p><strong>Clues, never explanations <span class="pill decided">Decided</span>.</strong> No text, announcer or HUD ever states the twist. Players work it out from things they notice: the huge observation window, teammates flickering into rats, oddly tall door frames.</p>
+		<p><strong>The mask is the lie <span class="pill idea">Idea</span>.</strong> The "filter" doesn't clean the air. It feeds you a gas that keeps up the illusion that you're human. When it runs low, the truth leaks in: a friend looks like a rat for a moment, voices squeak. Everyone sees this separately, based on their own filter. Seeing the truth might even be useful (rat-sized gaps, scent trails), so players may choose to let it run down.</p>
+		<p><strong>Why you keep upgrades when you die <span class="pill leaning">Leaning</span>.</strong> The real you is outside the test. When the rat dies, you don't, so you keep what's "in your head" (research, upgrades, level) and lose what the rat carried (gear, loot).</p>
+	</div>
+</section>
+
+<section id="round">
+	<h2>How a round works</h2>
+	<p>The retrieval mode, the one most like R.E.P.O. <span class="pill leaning">Leaning</span></p>
+	<ol class="loop">
+		<li><span><strong>Deploy</strong> into a site where something lives.</span></li>
+		<li><span><strong>Collect</strong> evidence, data and specimens while dealing with the creatures.</span></li>
+		<li><span><strong>Get out</strong> alive with what you carried.</span></li>
+		<li><span><strong>Sell</strong> to the government, or the black market for more money and a risk of a fine.</span></li>
+		<li><span><strong>Upgrade</strong> between rounds: research tree, upgrades, crate opening. Never mid-round.</span></li>
+	</ol>
+	<p><strong>Your characters last <span class="pill leaning">Leaning</span>.</strong> Unlike R.E.P.O., characters are saved between sessions. The twist: a character you don't play gets rusty. "Time" means runs played on your other characters, not days on the calendar, so taking a break never hurts you. How characters are saved is <span class="pill decided">Decided</span>; which abilities decay and by how much is still open.</p>
+</section>
+
+<section id="modes">
+	<h2>Game modes</h2>
+	<p>Retrieval might be one of several modes <span class="pill idea">Idea</span>: <strong>retrieval</strong>, <strong>maze solving</strong>, <strong>payload delivery</strong> and <strong>research</strong>. Only the maze has been designed so far.</p>
+	<h3>The maze: Portal-style test chambers</h3>
+	<p>A maze is a chain of test chambers. Each one is a physics puzzle: get the whole team from the entry door to the exit. Clean white-and-grey rooms, bright light, and a big observation window high on the wall where the real scientists watch.</p>
+	<ul>
+		<li><strong>Pressure plates</strong> held down by weight: a player, the heavy case, or a pile of crates. A jar isn't heavy enough. <em>Built.</em></li>
+		<li><strong>Timed buttons</strong> you press, or hit with a thrown crate. The door stays open for 5 seconds, so someone has to run. <em>Built.</em></li>
+		<li><strong>Doors never crush anyone.</strong> Something in the doorway stops them, so a crate can jam a door open. Improvising is the point. <em>Built.</em></li>
+		<li><strong>Co-op locks, acid-melted panels, sound-triggered doors</strong> <span class="pill idea">Idea</span></li>
+		<li><strong>The experimenters adapt.</strong> Solve too fast and the next chamber gets harder; struggle and they "help" in a condescending way. They talk over the PA, getting stranger as your mind slips. <span class="pill idea">Idea</span></li>
+		<li><strong>No "you beat the rat" score</strong> <span class="pill decided">Decided</span>. It would give the secret away.</li>
+		<li><strong>Rooms are stitched together</strong> each round from a pool, getting harder the further in you go. <span class="pill leaning">Leaning</span></li>
+		<li><strong>Starting difficulty</strong> leans toward the strongest player, so a strong player can't be carried and nobody can game it with low-level friends. <span class="pill leaning">Leaning</span></li>
+		<li><strong>No portal gun</strong> for now. <span class="pill leaning">Leaning</span></li>
+	</ul>
+</section>
+
+<section id="today">
+	<h2>What's playable today</h2>
+	<p>Two levels: a dark test room with a creature in it, and one grey-box test chamber. Up to a few players on the same network.</p>
+	<div class="features">
+		<div>
+			<h3>Carrying</h3>
+			<ul>
+				<li>Grab, carry, fling and throw crates, jars and a heavy case</li>
+				<li>Heavy things feel heavy</li>
+				<li>Push and pull what you're holding</li>
+			</ul>
+		</div>
+		<div>
+			<h3>The gas mask</h3>
+			<ul>
+				<li>You see everything through a full-face mask</li>
+				<li><strong>Cracks in the glass are your health.</strong> Hits crack the side they came from</li>
+				<li>The HUD glows green on the glass</li>
+				<li>Breath fogs the glass, the mask sways</li>
+			</ul>
+		</div>
+		<div>
+			<h3>The filter</h3>
+			<ul>
+				<li>Lasts <span class="num">180 s</span>, faster if you sprint</li>
+				<li>Below <span class="num">15%</span> your mind starts to go: the HUD scrambles and tears, vision narrows, ears ring</li>
+				<li>Spare canisters to screw on, carry or throw to a friend</li>
+			</ul>
+		</div>
+		<div>
+			<h3>Sound</h3>
+			<ul>
+				<li>You hear yourself breathe, wheeze as the filter wears, and a heartbeat when badly hurt</li>
+				<li>The world sounds muffled through the mask, clearer as it cracks</li>
+				<li>All sounds are generated by the game (placeholders for now)</li>
+			</ul>
+		</div>
+		<div>
+			<h3>The evil guy</h3>
+			<ul>
+				<li>Our first creature (placeholder look: a tall dark shape, red eyes)</li>
+				<li>Only knows what it sees and hears. Sprinting is loud, walking is quiet</li>
+				<li>Eyes show its mood: dim, orange (suspicious), bright red (hunting)</li>
+				<li>Searches where it last saw you, then gives up</li>
+				<li>Always walks a real path to you. You can outrun it by sprinting</li>
+			</ul>
+		</div>
+		<div>
+			<h3>Fighting &amp; dying</h3>
+			<ul>
+				<li>The Scientist throws a flask of glowing acid: <span class="num">50</span> damage, <span class="num">2 m</span> splash, refills in <span class="num">5 s</span></li>
+				<li>You have <span class="num">100</span> health; it hits for <span class="num">20</span></li>
+				<li>Dead players respawn after <span class="num">8 s</span> (placeholder)</li>
+			</ul>
+		</div>
+	</div>
+	<p class="muted">Look: dark comic-book style with hard-edged light and thin ink outlines, plus a grainy cheap-camera filter. Still being judged <span class="pill leaning">Leaning</span>; press <kbd>F2</kbd> in-game to compare with and without.</p>
+</section>
+
+<section id="controls">
+	<h2>Controls</h2>
+	<div class="table"><table>
+		<tr><th>Key</th><th>What it does</th></tr>
+		<tr><td><kbd>WASD</kbd> <kbd>Space</kbd> <kbd>Shift</kbd></td><td>Move, jump, sprint</td></tr>
+		<tr><td><kbd>1</kbd>–<kbd>5</kbd> / scroll</td><td>Pick a hotbar slot. Slot 1 is your hands</td></tr>
+		<tr><td>Left click</td><td>Use the slot: grab with hands (hold to carry), throw the acid flask</td></tr>
+		<tr><td>Right click</td><td>Throw what you're carrying</td></tr>
+		<tr><td>Scroll while carrying</td><td>Push it away or pull it closer</td></tr>
+		<tr><td><kbd>E</kbd></td><td>Press a button, or screw on a spare filter</td></tr>
+		<tr><td><kbd>F2</kbd>–<kbd>F6</kbd></td><td>Switch visual effects on and off to compare looks</td></tr>
+		<tr><td><kbd>Esc</kbd></td><td>Free the mouse, leave the game</td></tr>
+	</table></div>
+</section>
+
+<section id="status">
+	<h2>Where every idea stands</h2>
+	<div class="table"><table>
+		<tr><th>Topic</th><th>Status</th><th>In short</th></tr>
+		<tr><td>Engine</td><td><span class="pill decided">Decided</span></td><td>Godot, with C# code</td></tr>
+		<tr><td>Gas mask view</td><td><span class="pill decided">Decided</span></td><td>One wide visor; cracks are your health, no number</td></tr>
+		<tr><td>Filter</td><td><span class="pill decided">Decided</span></td><td>Runs out; timings still being tuned</td></tr>
+		<tr><td>Creature AI</td><td><span class="pill decided">Decided</span></td><td>Acts only on what it sees, hears and remembers</td></tr>
+		<tr><td>Hotbar</td><td><span class="pill decided">Decided</span></td><td>Slot 1 hands, 2–5 your kit</td></tr>
+		<tr><td>Saving characters</td><td><span class="pill decided">Decided</span></td><td>Saved on your own computer; the host sanity-checks it</td></tr>
+		<tr><td>Twist stays hidden</td><td><span class="pill decided">Decided</span></td><td>Clues only, never spelled out</td></tr>
+		<tr><td>Round loop</td><td><span class="pill leaning">Leaning</span></td><td>Deploy, collect, extract, sell, upgrade</td></tr>
+		<tr><td>Art style</td><td><span class="pill leaning">Leaning</span></td><td>Mid-poly, comic-book shading, grainy camera</td></tr>
+		<tr><td>Classes</td><td><span class="pill leaning">Leaning</span></td><td>Each scientist type brings a kit; only the Scientist exists</td></tr>
+		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health, timed respawn as a stand-in</td></tr>
+		<tr><td>Mind vs body damage</td><td><span class="pill leaning">Leaning</span></td><td>One health pool; mind damage can't kill you</td></tr>
+		<tr><td>Characters that rust</td><td><span class="pill leaning">Leaning</span></td><td>Benched characters get worse</td></tr>
+		<tr><td>Rat lore</td><td><span class="pill idea">Idea</span></td><td>You are a rat with a human brain</td></tr>
+		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research</td></tr>
+		<tr><td>Black market</td><td><span class="pill idea">Idea</span></td><td>Pays more, risk of a fine</td></tr>
+		<tr><td>Research tree</td><td><span class="pill idea">Idea</span></td><td>Factorio-style, between rounds</td></tr>
+		<tr><td>Prestige</td><td><span class="pill idea">Idea</span></td><td>Phasmophobia-style rebirth</td></tr>
+		<tr><td>Players as monsters</td><td><span class="pill idea">Idea</span></td><td>Played from a phone, as a different kind of game. Try on PC first</td></tr>
+		<tr><td>Building</td><td><span class="pill idea">Idea</span></td><td>Low confidence</td></tr>
+	</table></div>
+</section>
+
+<section id="next">
+	<h2>What we're deciding next</h2>
+	<p>The maze is in progress (next: chain chambers together, then add the evil guy to them). After that, pick one:</p>
+	<div class="table"><table>
+		<tr><th>Option</th><th>What it gets us</th></tr>
+		<tr><td>Loot + round loop ★</td><td>Recommended. Turns the tech demo into a game: loot with value that loses money when it breaks, an extraction point, a timer and a payout.</td></tr>
+		<tr><td>Combat polish</td><td>Fighting feels good: acid puddles, the creature reacting to thrown things, better death.</td></tr>
+		<tr><td>Steam + online play</td><td>Friends can play over the internet. Needed before any remote playtest.</td></tr>
+		<tr><td>Voice chat by distance</td><td>The R.E.P.O. social magic. Easiest after Steam.</td></tr>
+	</table></div>
+</section>
+
+<section id="questions">
+	<h2>Open questions</h2>
+	<p>Things nobody has answered yet. Bring opinions.</p>
+	<ul class="questions">
+		<li><span class="label">Loot</span><span>Does loot have a value that drops when it gets damaged? Is there evidence you don't carry (photos, recordings)?</span></li>
+		<li><span class="label">Selling</span><span>How do you get caught on the black market, who pays the fine, and can it follow you into rounds?</span></li>
+		<li><span class="label">Death</span><span>Timed respawn, a teammate revives you, or out for the round? What exactly do you lose?</span></li>
+		<li><span class="label">Healing</span><span>Right now only respawning heals. Should anything else?</span></li>
+		<li><span class="label">Characters</span><span>Which abilities get rusty, how fast, and can you train them back? Are upgrades per character or shared?</span></li>
+		<li><span class="label">Classes</span><span>Which other scientist types exist, and what do they carry?</span></li>
+		<li><span class="label">Acid</span><span>Should it hurt teammates? Should it leave puddles?</span></li>
+		<li><span class="label">Filter</span><span>Is 180 s right? Should swapping take time? Where do spares come from?</span></li>
+		<li><span class="label">Readability</span><span>Do the cracks and HUD glitches read clearly enough to drop the debug bars?</span></li>
+		<li><span class="label">Lore</span><span>Does the rat story replace the "selling evidence" pitch or reframe it? What is the evil guy? How does the madness build and go away?</span></li>
+		<li><span class="label">Modes</span><span>What do payload and research play like? Picked per round, per run, or voted?</span></li>
+		<li><span class="label">Maze</span><span>How many rooms? Does the whole team dying end it?</span></li>
+		<li><span class="label">Monsters</span><span>What can monster players do, how many per match, phone or PC?</span></li>
+		<li><span class="label">Look</span><span>Keep the grain if we keep the comic-book shading?</span></li>
+		<li><span class="label">Name</span><span>"RND" is a working title. What's the real one?</span></li>
+	</ul>
+</section>
+
+<section id="later">
+	<h2>Later</h2>
+	<p>Rough order, will change:</p>
+	<ul>
+		<li>Footstep sounds, hearing teammates breathe, retuning or recording real sounds</li>
+		<li>Deeper filter: swaps that take time, gas zones, filter types</li>
+		<li>Smarter creature: learns your habits, reacts to light, several that share what they notice</li>
+		<li>More scientist types, more creatures, more kinds of evidence</li>
+		<li>Selling, the between-round hub, research tree, crate opening, prestige</li>
+		<li>Saved characters (designed, not built)</li>
+		<li>Players as monsters</li>
+		<li>Art pass: real models, lighting, sound</li>
+	</ul>
+</section>
+
+<section id="rough">
+	<h2>Known rough edges</h2>
+	<p>On purpose for now, so don't file these as bugs:</p>
+	<ul>
+		<li>You can only play together <strong>on the same network</strong>. Online play comes with Steam.</li>
+		<li>Names above players show numbers, not names (also comes with Steam).</li>
+		<li>Walking into props doesn't push them; you have to grab them.</li>
+		<li>No crouching or stamina yet.</li>
+		<li>Death is a placeholder: you tip over and come back after 8 seconds.</li>
+		<li>Only one creature type, and it can drop down ledges but can't jump up.</li>
+		<li>Sounds are placeholders, tuned by numbers rather than by ear.</li>
+		<li>Solving the test chamber doesn't lead anywhere yet. There's only one.</li>
+		<li>The chamber's plates, buttons and doors haven't been tested with several players yet, and they don't have their own sounds.</li>
+		<li>If the game acts strangely right after pulling new code, close Godot completely and reopen it.</li>
+	</ul>
+</section>
+
+<section id="tech">
+	<h2>How it's built</h2>
+	<ul>
+		<li><strong>Godot 4.7 (.NET edition) with C#.</strong> Everyone must use the same Godot version.</li>
+		<li><strong>One player hosts</strong> and everyone else joins them. No servers to run. The host is in charge of anything shared (props, health, the creature) so nobody's game disagrees; your own movement is handled on your machine so it feels instant.</li>
+		<li><strong>Jolt physics</strong>, because stacking and carrying is the heart of the game.</li>
+		<li><strong>All sound is generated in code.</strong> There are no audio files yet.</li>
+		<li><strong>Steam, voice chat and our own server</strong> are planned but not chosen.</li>
+		<li><strong>Automated tests</strong> start the game without a window and check that levels load, combat works and two players can connect.</li>
+	</ul>
+	<p class="muted">Setup steps are in the repo's README.</p>
+</section>
+
+<section id="art">
+	<h2>For artists</h2>
+	<ul>
+		<li><strong>Format:</strong> <span class="num">.glb</span>, real-world size (1 unit = 1 metre), origin at the bottom centre.</li>
+		<li><strong>Size budget:</strong> small props <span class="num">500–3,000</span> triangles, characters <span class="num">5–15k</span>.</li>
+		<li><strong>Name every part</strong> (Glass, Liquid, Cap, Label). The code finds parts by name.</li>
+		<li><strong>No painted lighting or shadows</strong> in textures. Flat colour areas and clean, deliberate sharp and smooth edges. The game does the shading.</li>
+		<li><strong>Anything that changes during play is code.</strong> Model the thing, not the effect. For liquids, model a closed Liquid shape filling the whole inside; the game sets how full it is and makes it slosh.</li>
+		<li>No collision shapes needed; we make those in Godot.</li>
+		<li>Nothing is rigged or animated yet. When it is, each animation gets a fixed name (Idle, Walk, Run…) that the code plays.</li>
+	</ul>
+	<p class="muted">Full details are in <span class="num">docs/ART.md</span>.</p>
+</section>
+
+<section id="words">
+	<h2>Glossary</h2>
+	<dl>
+		<dt>The evil guy</dt><dd>Our first and only creature, a placeholder.</dd>
+		<dt>Filter</dt><dd>The canister on your mask. Runs out. Secretly not a filter.</dd>
+		<dt>Mental damage</dt><dd>Damage to your mind rather than your body. Scrambles the HUD instead of cracking the glass, and can't kill you.</dd>
+		<dt>Psychosis</dt><dd>Working name for seeing the truth: you and your friends look like rats.</dd>
+		<dt>Test chamber</dt><dd>One puzzle room in the maze mode.</dd>
+		<dt>Kit</dt><dd>The items a scientist type carries in hotbar slots 2–5.</dd>
+		<dt>Host</dt><dd>The player whose game everyone else joins.</dd>
+		<dt>Grey-box</dt><dd>A level made of plain blocks to test gameplay before art.</dd>
+	</dl>
+</section>
+
+<footer>Written from the team's working notes in the repo (<span class="num">docs/DESIGN.md</span>, <span class="num">ROADMAP.md</span>, <span class="num">DECISIONS.md</span>, <span class="num">ART.md</span>). If this page and those disagree, the notes are newer: tell whoever's updating it.</footer>
+</main>
+</div>

@@ -23,6 +23,11 @@ update the matching doc in the same turn:
 - New or changed tech choice → append a dated entry to `docs/DECISIONS.md`
 - Milestone progress → `docs/ROADMAP.md` (and bump "Last updated")
 
+The markdown docs are Claude's working notes. **`docs/overview.html` is the team's plain-English
+handbook** (no class names, file paths or code terms), published as an Artifact the team shares.
+When a change would alter something it says (a status tag, what's playable, controls, open
+questions, next steps), update it too, bump its date, and republish it.
+
 ## Working in the code
 
 - Build: `dotnet build game/RND.sln`
