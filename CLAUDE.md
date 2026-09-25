@@ -43,8 +43,8 @@ update the matching doc in the same turn:
   the dev machine: it's 7.1 surround, and the recorder misses non-positional sound.
 - Atmosphere-only sounds (ambience) go through `audio/Ambience.cs`, not `EmitSound`.
 - Materials: author ordinary `StandardMaterial3D`s. `vfx/ToonStyle.cs` turns opaque ones into the
-  cel-shaded look at runtime (F2 toggles it), and animating the original's albedo or emission still
-  works. Liquids: a closed `Liquid` mesh + `vfx/Liquid.cs` + `vfx/liquid.gdshader`. A model used
+  cel-shaded look at runtime (F2 toggles it; the F2–F6 look switches are one table in `ui/Hud.cs`),
+  and animating the original's albedo or emission still works. Liquids: a closed `Liquid` mesh + `vfx/Liquid.cs` + `vfx/liquid.gdshader`. A model used
   in several places (prop, in hand, thrown) is one scene in `models/`, instanced by each.
 - Enemies only act on what they perceive (sight cone, hearing, memory). Don't give AI direct
   access to player positions it couldn't know.
@@ -53,6 +53,7 @@ update the matching doc in the same turn:
   shader, phosphor green, and they must avoid the nose cup at the bottom centre). Menus and
   debug go in `ui/hud.tscn` (crisp). Health is shown by visor cracks, not a number.
 - Shader and visual changes can't be verified headless: run the smoke test's `capture` role
-  (windowed, opens a window for a few seconds) and look at the screenshots. New hotbar items are `.tres`
+  (windowed, opens a window for a few seconds) and look at the screenshots. It also checks that
+  cel shading doesn't change the room's brightness. New hotbar items are `.tres`
   files (`items/`), added to a player's `Loadout`. New spawnable scenes must be listed in the
   level's matching MultiplayerSpawner.

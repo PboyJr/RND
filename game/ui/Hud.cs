@@ -1,16 +1,26 @@
+using System.Linq;
 using Godot;
 using RND.Core;
 using RND.Players;
+using RND.Vfx;
 
 namespace RND.UI;
 
 /// <summary>
-/// The crisp overlay outside the mask: pause menu, death message, session status, and a deliberately
-/// unstyled debug readout of health and filter. (The real health bar is the visor's cracks, and the
-/// in-mask HUD is VisorHud.)
+/// The crisp overlay outside the mask: pause menu, death message, session status, a deliberately
+/// unstyled debug readout of health and filter, and debug hotkeys that switch parts of the look on
+/// and off to compare. (The real health bar is the visor's cracks, and the in-mask HUD is VisorHud.)
 /// </summary>
 public partial class Hud : Control
 {
+	[Export] public ToonStyle Toon { get; set; }
+	[Export] public Visor Visor { get; set; }
+
+	// Key, label, and the bool property it flips. Defaults are those properties in the Inspector.
+	private (Key Key, string Label, GodotObject Target, string Property)[] _viewToggles;
+	private Label _viewTogglesList;
+	private double _viewTogglesShownUntil;
+
 	private Label _status;
 	private Control _pauseMenu;
 	private ProgressBar _debugHealth;
@@ -28,6 +38,15 @@ public partial class Hud : Control
 		_debugHealth = GetNode<ProgressBar>("DebugHealth");
 		_debugFilter = GetNode<Label>("DebugFilter");
 		_deathLabel = GetNode<Label>("DeathLabel");
+		_viewTogglesList = GetNode<Label>("ViewToggles");
+		_viewToggles = new (Key, string, GodotObject, string)[]
+		{
+			(Key.F2, "cel shading", Toon, nameof(ToonStyle.Enabled)),
+			(Key.F3, "outlines", Toon, nameof(ToonStyle.Outlines)),
+			(Key.F4, "film grain", Visor, nameof(Visor.Grain)),
+			(Key.F5, "colour crush", Visor, nameof(Visor.ColourCrush)),
+			(Key.F6, "lens (curve, edge blur, fringe)", Visor, nameof(Visor.Lens)),
+		};
 
 		GetNode<Button>("%Resume").Pressed += () => SetPaused(false);
 		GetNode<Button>("%Leave").Pressed += () => Network.Instance.Leave();
@@ -50,6 +69,11 @@ public partial class Hud : Control
 	{
 		if (!Visible)
 			return;
+
+		_viewTogglesList.Visible = Now < _viewTogglesShownUntil;
+		if (_viewTogglesList.Visible)
+			_viewTogglesList.Text = string.Join("\n", _viewToggles.Select(t =>
+				$"{t.Key}  {t.Label}: {(t.Target.Get(t.Property).AsBool() ? "on" : "off")}"));
 
 		int playerCount = Multiplayer.GetPeers().Length + 1;
 		_status.Text = $"{(Multiplayer.IsServer() ? "Hosting" : "Connected")}  ·  {playerCount} in session";
@@ -76,6 +100,18 @@ public partial class Hud : Control
 		if (Visible && @event.IsActionPressed("pause"))
 		{
 			SetPaused(!_pauseMenu.Visible);
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
+		if (@event is not InputEventKey { Pressed: true, Echo: false } key)
+			return;
+		foreach ((Key toggleKey, _, GodotObject target, string property) in _viewToggles)
+		{
+			if (key.Keycode != toggleKey)
+				continue;
+			target.Set(property, !target.Get(property).AsBool());
+			_viewTogglesShownUntil = Now + 3.0; // flash the list so you can see what's on
 			GetViewport().SetInputAsHandled();
 		}
 	}

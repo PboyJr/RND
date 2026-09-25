@@ -87,6 +87,10 @@ Goal: sound sells the mask as much as the visor does.
 - [x] Acid beaker → **acid flask**: the Erlenmeyer flask in your hand (and thrown), its acid
       refilling over the 15 s recharge, visible to everyone; one shared flask model scene
 - [x] Thinner outlines (1 px instead of 2), width / colour adjustable in the Inspector
+- [x] Debug view hotkeys F2–F6 (cel shading, outlines, grain, colour crush, lens), defaults in the
+      Inspector
+- [x] Cel shading keeps the room as dark as without it (it was 89% brighter). The capture test
+      measures this
 
 ---
 

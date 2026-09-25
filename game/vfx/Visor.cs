@@ -13,6 +13,12 @@ public partial class Visor : ColorRect
 {
 	[Export] public SubViewport HudViewport { get; set; }
 
+	// Look switches: the Hud's debug hotkeys flip these (F4–F6), and these checkboxes are the defaults.
+	[ExportGroup("Effects")]
+	[Export] public bool Grain { get; set; } = true;
+	[Export] public bool ColourCrush { get; set; } = true;
+	[Export] public bool Lens { get; set; } = true; // glass curve, edge blur, colour fringe
+
 	[ExportGroup("Sway")]
 	// Visor-space offset per rad/s of turning, and the cap on it.
 	[Export] public float SwayPerTurnSpeed { get; set; } = 0.02f;
@@ -43,6 +49,9 @@ public partial class Visor : ColorRect
 		if (player != _player)
 			Bind(player);
 
+		_material.SetShaderParameter("grain_on", Grain);
+		_material.SetShaderParameter("crush_on", ColourCrush);
+		_material.SetShaderParameter("lens_on", Lens);
 		_material.SetShaderParameter("visor_enabled", player != null ? 1f : 0f);
 		if (player == null)
 			return;

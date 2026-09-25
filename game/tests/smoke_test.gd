@@ -449,10 +449,23 @@ func _run_capture() -> void:
 	var toon := _main.get_node("ToonStyle")
 	toon.Enabled = false
 	await _seconds(0.3)
-	await _screenshot(out.path_join("toon_off.png"))
+	var plain := _brightness(await _screenshot(out.path_join("toon_off.png")))
 	toon.Enabled = true
 	await _seconds(0.3)
-	await _screenshot(out.path_join("toon_on.png"))
+	var toon_lit := _brightness(await _screenshot(out.path_join("toon_on.png")))
+	# Cel shading should band the light, not brighten or darken the room (see vfx/toon_ramp.tres).
+	_log("brightness: toon off %.3f, on %.3f (%+.0f%%)" % [plain, toon_lit, (toon_lit / plain - 1.0) * 100.0])
+	_check(absf(toon_lit / plain - 1.0) < 0.2, "capture: cel shading changes the room's brightness by more than 20%")
+
+	# The view hotkeys: F4 / F5 turn film grain and colour crush off (and back on).
+	var visor := _main.get_node("PostFX/Visor")
+	_press(KEY_F4)
+	_press(KEY_F5)
+	await _seconds(0.3)
+	_check(not visor.Grain and not visor.ColourCrush, "capture: F4 / F5 didn't turn grain and colour crush off")
+	await _screenshot(out.path_join("toon_on_clean.png"))
+	_press(KEY_F4)
+	_press(KEY_F5)
 
 	# Liquid close-up: stand at the table's end facing the flask, zoom in, then shove it sideways and
 	# catch it mid-slosh.
@@ -512,10 +525,32 @@ func _meter(label: String, seconds: float) -> void:
 	_log("%-30s Mask %6.1f dB   World %6.1f dB   Master %6.1f dB" % [label, loudest["Mask"], loudest["World"], loudest["Master"]])
 
 
-func _screenshot(path: String) -> void:
+func _screenshot(path: String) -> Image:
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(path)
+	var image := get_viewport().get_texture().get_image()
+	image.save_png(path)
 	_log("saved " + path)
+	return image
+
+
+func _press(key: Key) -> void:
+	var event := InputEventKey.new()
+	event.keycode = key
+	event.pressed = true
+	Input.parse_input_event(event)
+
+
+# Average brightness of the middle of the view (above the hotbar and hints), sampled on a grid.
+func _brightness(image: Image) -> float:
+	var w := image.get_width()
+	var h := image.get_height()
+	var total := 0.0
+	var count := 0
+	for y in range(int(h * 0.17), int(h * 0.64), 4):
+		for x in range(int(w * 0.16), int(w * 0.84), 4):
+			total += image.get_pixel(x, y).get_luminance()
+			count += 1
+	return total / count
 
 
 # The host runs the evil guy and all damage. The client gets hit, then hits back.

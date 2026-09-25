@@ -40,12 +40,15 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
   edge (thin, 1 px by default; the width is adjustable). It reads like a dark comic: hard-edged
   warm light pools on the walls, crisp props, and the evil guy as a silhouette with glowing eyes.
   It's done in code over ordinary materials, so it applies to everything including grey-box (see
-  [ART.md](ART.md)). Keep the ramp's low end dark so shadows stay scary.
+  [ART.md](ART.md)). It keeps the room exactly as dark as without it, and only turns smooth
+  light into hard-edged bands (the screenshot test checks this). Shadows stay scary.
 - **Liquids** (flasks, specimen jars): glowing liquid that stays level in the world, sloshes when
   you move or throw the container, and settles. Fill level is controllable: the acid flask in
   your hand refills as it recharges.
 - The prototype already has a grain pass: film grain, a slightly crushed palette, colour fringing
   and a vignette (part of `game/vfx/visor.gdshader`). UI draws above it and stays crisp.
+  `Open`: grain and colour crush look good on the smooth look but choppy over cel shading (the
+  user's take). F4 / F5 switch them off to compare. If cel shading stays, maybe it drops them.
 
 ## Core loop (`Leaning`)
 

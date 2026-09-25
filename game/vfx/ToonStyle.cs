@@ -5,7 +5,7 @@ using Godot;
 namespace RND.Vfx;
 
 /// <summary>
-/// The cel-shading switch (F2 toggles it, to compare). While it's on:
+/// The cel-shading switch (F2 toggles it, see the view hotkeys in ui/Hud.cs). While it's on:
 /// - every ordinary opaque material in the game is swapped for the toon shader (vfx/toon.gdshader),
 ///   and each toon copy is kept in sync with its original every frame (albedo, emission), so hit
 ///   flashes and the evil guy's mood-coloured eyes keep working;
@@ -34,6 +34,9 @@ public partial class ToonStyle : Node
 		}
 	}
 
+	// The ink lines, on their own (F3). They only show while cel shading is on.
+	[Export] public bool Outlines { get; set; } = true;
+
 	private bool _enabled = true;
 	// Original material -> its toon copy. (Prototype: copies of freed materials linger until the
 	// game closes. It's a handful per enemy respawn.)
@@ -45,12 +48,6 @@ public partial class ToonStyle : Node
 	{
 		GetTree().NodeAdded += OnNodeAdded;
 		Refresh();
-	}
-
-	public override void _UnhandledInput(InputEvent @event)
-	{
-		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.F2 })
-			Enabled = !Enabled;
 	}
 
 	public override void _Process(double delta)
@@ -167,6 +164,7 @@ public partial class ToonStyle : Node
 			};
 		}
 
+		_outline.Visible = Outlines;
 		if (_outline.GetParent() != camera)
 		{
 			_outline.GetParent()?.RemoveChild(_outline);

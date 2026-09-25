@@ -79,7 +79,7 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | Scroll while carrying | Push / pull |
 | LMB with the acid flask | Throw it (15 s recharge; the flask in your hand refills) |
 | E on (or holding) a spare filter | Screw it onto your mask |
-| F2 | Toggle the cel-shaded look (prototype), to compare |
+| F2 – F6 | Debug view switches, to compare looks: cel shading, outlines, film grain, colour crush, lens (glass curve, edge blur, fringe). Pressing one lists what's on, top right |
 | Esc | Free the mouse, leave session |
 
 You see everything through a gas mask. **The cracks in the glass are your health**; there's no
@@ -155,7 +155,9 @@ godot --headless res://tests/smoke_test.tscn -- --role=audio --out=C:/some/folde
 ## Notes
 
 - Commit the `.uid` files Godot creates next to scripts and shaders.
-- Tune the cel-shading outlines (width, colour) on `Main/ToonStyle`'s Outline Material.
+- Tune the cel-shading outlines (width, colour) on `Main/ToonStyle`'s Outline Material, and its
+  light bands in `vfx/toon_ramp.tres`. The `capture` test fails if the bands change the room's
+  overall brightness by more than 20%.
 - Tune the visor and camera look (glass curve, rim colour, grain, colour crush) on
   `Main/PostFX/Visor`'s material. Breathing and sway feel are exports on the `Visor` node.
 - What's next: see the [Roadmap](docs/ROADMAP.md).

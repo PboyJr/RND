@@ -19,11 +19,14 @@ uniform float hit_flash : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 sway = vec2(0.0);                         // the mask lagging behind where you look
 uniform float glass_curve : hint_range(0.0, 0.3) = 0.06;
 uniform vec3 rim_color : source_color = vec3(0.02, 0.022, 0.025);
+uniform bool lens_on = true; // glass curve, edge blur and colour fringe
 
 group_uniforms camera;
 uniform float grain_strength : hint_range(0.0, 0.5) = 0.07;
 uniform float grain_fps : hint_range(1.0, 60.0) = 24.0;
 uniform float color_levels : hint_range(4.0, 256.0) = 48.0;
+uniform bool grain_on = true;
+uniform bool crush_on = true;
 group_uniforms;
 
 // Where each crack starts (xy, visor space) and how much damage it takes before it appears (z).
@@ -120,15 +123,16 @@ void fragment() {
 	}
 
 	// Curved glass: a slight bulge, stronger toward the rim.
-	vec2 uv_glass = uv - (uv - 0.5) * glass_curve * on * dot(p, p) * 0.15 + shift;
+	float lens = lens_on ? on : 0.0;
+	vec2 uv_glass = uv - (uv - 0.5) * glass_curve * lens * dot(p, p) * 0.15 + shift;
 
 	// Breath condensation pools low around the mouth, blotchy, pulsing with each exhale.
 	float mouth = smoothstep(0.35, -0.95, p.y) * (1.0 - smoothstep(0.2, 1.3, abs(p.x)));
 	float blotch = value_noise(p * 5.0 + vec2(0.0, TIME * 0.05));
 	float fogged = clamp(fog * on * (mouth * 1.7 + 0.2) * (0.55 + 0.9 * blotch), 0.0, 1.0);
 
-	float blur = near_rim * 2.0 * on + fogged * 4.5;
-	float fringe = 0.005 * near_rim * on;
+	float blur = near_rim * 2.0 * lens + fogged * 4.5;
+	float fringe = 0.005 * near_rim * lens;
 	vec2 dir = uv_glass - 0.5;
 	vec3 col;
 	col.r = textureLod(screen_texture, uv_glass + dir * fringe, blur).r;
@@ -163,9 +167,13 @@ void fragment() {
 	col = mix(rubber, col, glass);
 
 	// Cheap camera over everything: crushed palette, film grain, and a vignette when there's no mask.
-	col = floor(col * color_levels + 0.5) / color_levels;
-	float frame = mod(floor(TIME * grain_fps), 1024.0);
-	col += (hash12(FRAGCOORD.xy + frame * vec2(37.0, 91.0)) - 0.5) * grain_strength;
+	if (crush_on) {
+		col = floor(col * color_levels + 0.5) / color_levels;
+	}
+	if (grain_on) {
+		float frame = mod(floor(TIME * grain_fps), 1024.0);
+		col += (hash12(FRAGCOORD.xy + frame * vec2(37.0, 91.0)) - 0.5) * grain_strength;
+	}
 	vec2 from_center = uv - 0.5;
 	col *= 1.0 - dot(from_center, from_center) * 0.6 * (1.0 - on);
 

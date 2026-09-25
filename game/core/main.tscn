@@ -63,7 +63,9 @@ HudViewport = NodePath("../../HudViewport")
 [node name="UI" type="CanvasLayer" parent="."]
 layer = 2
 
-[node name="Hud" parent="UI" instance=ExtResource("6_hud")]
+[node name="Hud" parent="UI" node_paths=PackedStringArray("Toon", "Visor") instance=ExtResource("6_hud")]
 visible = false
+Toon = NodePath("../../ToonStyle")
+Visor = NodePath("../../PostFX/Visor")
 
 [node name="MainMenu" parent="UI" instance=ExtResource("7_menu")]

@@ -346,7 +346,8 @@ meters instead.
   effects, liquids) are skipped.
 - Lighting bands come from `vfx/toon_ramp.tres` (a constant-interpolation gradient: light level in,
   brightness out), editable in the inspector. The thresholds are tuned for our dim, fast-falloff
-  lamps (0.05 / 0.25). The first try (0.22 / 0.6) turned most walls black.
+  lamps (0.05 / 0.25). The first try (0.22 / 0.6) turned most walls black. (Superseded below: the
+  ramp now keeps the room's brightness.)
 - Outlines are a screen-space pass (`vfx/outline.gdshader`) on a full-screen quad parented to the
   active camera: depth and normal discontinuities, fading with distance. It reads the normal
   buffer, so it's **Forward+ only** (fine for PC; phones would need another approach).
@@ -388,6 +389,33 @@ The outline material lives on `Main/ToonStyle` (**Outline Material** in the Insp
 colour, sensitivity and fade distance are its shader parameters.
 
 **Why:** the user wanted thinner lines.
+
+## 2026-09-24: The toon ramp keeps the room's brightness
+
+**Decision:** each step of `vfx/toon_ramp.tres` outputs roughly the average light level it
+covers (the steps follow the diagonal): below 0.03 → 0.01, 0.03–0.15 → 0.07, above 0.15 → 0.3.
+Cel shading then only bands the light into hard edges and doesn't change how bright the room
+is. The `capture` role measures the average brightness of the view with cel shading off and on,
+logs both, and fails if they differ by more than 20%.
+
+**Why:** the old ramp (0.05 → 0.5, 0.25 → 1.0) made the view 89% brighter than without cel
+shading. A wall getting 5% light rendered at 50%, which killed the dark mood. The new ramp
+measures −1%.
+To get more punch at the same brightness, spread the steps apart (darker darks, brighter lights),
+and let the capture check keep the average honest.
+
+## 2026-09-24: Debug view hotkeys are one table in the Hud
+
+**Decision:** F2–F6 switch parts of the look on and off to compare: cel shading, outlines, film
+grain, colour crush, and the lens effects (glass curve, edge blur, colour fringe). Each one is a
+bool `[Export]` on the node that owns it (`ToonStyle.Enabled` / `Outlines`, `Visor.Grain` /
+`ColourCrush` / `Lens`), so **the Inspector checkboxes are the defaults**. `ui/Hud.cs` holds the
+key → property table, and after each press it lists what's on (top right, for 3 s). The visor
+shader skips grain / crush / lens with `grain_on` / `crush_on` / `lens_on`. Breath fog, cracks and
+choking can't be switched off: they're gameplay feedback.
+
+**Why:** the user wanted to compare effects. Grain and colour crush look good on the smooth
+look but choppy over cel shading. Adding a new switch is one line in the table.
 
 ---
 
