@@ -70,7 +70,11 @@ Working title: **RND** (repo name). The first notes were titled "1" (in Comic Sa
     drips, the hairlines running dark red. A clue, not an explanation: whose blood, and was the glass
     ever cracked? Open: losing the crosshair with the HUD makes grabbing hard; keep it? Your vision also
     narrows a little and a thin tinnitus ring comes in. So "how hurt am I" is cracks plus HUD
-    corruption. Withdrawal is the only mental damage so far. **A fresh filter stops withdrawal but
+    corruption. Withdrawal is the only mental damage so far. **Mental damage can't kill you**: it stops
+    at 25 health, like poison in Minecraft, so you can live with a lost mind (and see it). How far gone
+    you are (the purple debug bar, and what drives the effects) is measured against what's left to
+    lose down to that floor, so everything is at full strength when you reach it. Physical hits can
+    still finish you. **A fresh filter stops withdrawal but
     heals nothing:** health and sanity only come back on respawn for now (Open: healing, later). A purple debug bar shows how much of
     the lost health is mental.
   - `Open`: is everything you see while low real, or is some of it hallucination to muddy the

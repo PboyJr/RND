@@ -67,7 +67,7 @@ public partial class MaskAudio : Node
 			FilterWear = 1f - player.Respirator.Fraction,
 			// Kicks in audibly the moment you drop under half health, then builds to nearly dead.
 			Danger = health < 0.5f ? Mathf.Lerp(0.35f, 1f, (0.5f - health) / 0.5f) : 0f,
-			Mind = player.Health.Mental / player.Health.MaxHealth,
+			Mind = player.Health.MentalFraction,
 		});
 		_playback.PushBuffer(_buffer);
 	}

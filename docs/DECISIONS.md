@@ -476,6 +476,8 @@ being plain levels means stitching them together later is about placing rooms, n
 `TakeMentalDamage` (host only) takes it off `Current` and adds it to `Mental`; `Physical`
 (`Current + Mental`) is health counting only physical hits. `Damaged` only fires for physical
 damage, so mental damage doesn't flash your body or make an enemy retarget. Revive clears both.
+Mental damage stops at MentalFloor (25). MentalFraction = Mental / (Physical - MentalFloor), so
+it's 1 exactly when there's no mental damage left to take; the effects read that, not Mental / Max.
 The player's health synchronizer lists `Mental` **before** `Current`, so a client already has the
 new `Mental` when `Current` drops and can tell the drop was mental. The visor's cracks and the
 mask muffle follow `Physical`; the visor shader's `mind` uniform (Mental / MaxHealth) corrupts the

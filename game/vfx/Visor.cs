@@ -117,7 +117,7 @@ public partial class Visor : ColorRect
 		_material.SetShaderParameter("damage", _damage);
 		_material.SetShaderParameter("fog", Mathf.Clamp(fog, 0f, 1f));
 		_material.SetShaderParameter("choke", breathing.Choke);
-		float mind = player.Health.Mental / player.Health.MaxHealth;
+		float mind = player.Health.MentalFraction;
 		_material.SetShaderParameter("mind", mind); // the shader eases it (same curve as VisorHud)
 		_material.SetShaderParameter("hit_flash", _hitFlash);
 		_material.SetShaderParameter("sway", _sway);

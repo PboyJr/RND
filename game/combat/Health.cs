@@ -18,6 +18,8 @@ public partial class Health : Node
 	[Signal] public delegate void RevivedEventHandler();
 
 	[Export] public float MaxHealth { get; set; } = 100f;
+	// Mental damage can't take you below this (like poison in Minecraft): losing your mind doesn't kill you.
+	[Export] public float MentalFloor { get; set; } = 25f;
 
 	/// <summary>Replicated from the host. Change it with TakeDamage / Revive (host only).</summary>
 	[Export]
@@ -32,6 +34,9 @@ public partial class Health : Node
 	/// synchronizer so a client already knows a drop was mental when the new Current arrives.
 	/// </summary>
 	[Export] public float Mental { get; set; }
+
+	/// <summary>How far gone your mind is: 0 sane .. 1 when it has taken all it can (you're at MentalFloor).</summary>
+	public float MentalFraction => Mental <= 0f ? 0f : Mathf.Clamp(Mental / Mathf.Max(Physical - MentalFloor, 0.001f), 0f, 1f);
 
 	/// <summary>Health counting only physical damage: what the visor's cracks show.</summary>
 	public float Physical => Mathf.Min(MaxHealth, Current + Mental);
@@ -65,7 +70,9 @@ public partial class Health : Node
 		if (!Multiplayer.IsServer() || IsDead || amount <= 0f)
 			return;
 
-		float dealt = Mathf.Min(amount, Current);
+		float dealt = Mathf.Min(amount, Current - MentalFloor);
+		if (dealt <= 0f)
+			return;
 		Mental += dealt;
 		SetCurrent(Current - dealt, 0);
 	}

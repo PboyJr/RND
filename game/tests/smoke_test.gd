@@ -298,6 +298,8 @@ func _run_offline_filter(level: Node, player: Node3D) -> void:
 	var mental: float = health.Mental
 	health.TakeDamage(10.0, 0)
 	_check(is_equal_approx(health.Physical, health.MaxHealth - 10.0) and is_equal_approx(health.Mental, mental), "filter: a physical hit got counted as mental")
+	health.TakeMentalDamage(9999.0)
+	_check(is_equal_approx(health.Current, health.MentalFloor) and is_equal_approx(health.MentalFraction, 1.0), "filter: mental damage should stop at the floor, not kill (health %.1f)" % health.Current)
 
 	var canister := level.get_node("Props/FilterA") as RigidBody3D
 	player.global_position = canister.global_position + Vector3(0, 0, 1.2)

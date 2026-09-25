@@ -33,7 +33,7 @@ public partial class VisorHud : Control
 		if (!Visible)
 			return;
 
-		float mind = local.Health.Mental / local.Health.MaxHealth;
+		float mind = local.Health.MentalFraction;
 		mind *= mind; // eased in: a little mental damage barely shows (same curve as the visor shader)
 		_hint.Text = Scramble(local.Hint, mind);
 		_filter.Text = Scramble(FilterReadout(local.Respirator), mind);
