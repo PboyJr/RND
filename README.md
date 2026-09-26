@@ -60,6 +60,13 @@ work.
 To open scripts from Godot in VS: **Editor → Editor Settings → Dotnet → Editor → External Editor**
 → Visual Studio.
 
+## Getting a build
+
+Every push builds the game on GitHub (Actions → "Build and test"): it runs the smoke tests and
+uploads a Windows build as the run's **RND-windows** artifact. Download it, unzip, and run
+`RND.exe` (keep the folder next to it). To export yourself: Godot → **Project → Export** →
+**Windows** (needs the 4.7 .NET export templates: **Editor → Manage Export Templates**).
+
 ## Testing multiplayer on one PC
 
 **Debug → Customize Run Instances…** → tick **Enable Multiple Instances**, set it to 2, then Play.
@@ -84,7 +91,7 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | E on (or holding) a spare filter | Screw it onto your mask |
 | F2 – F6 | Debug view switches, to compare looks: cel shading, outlines, film grain, colour crush, lens (glass curve, edge blur, fringe). Pressing one lists what's on, top right |
 | F7 | Mute / unmute all sound (debug) |
-| Esc | Free the mouse, leave session |
+| Esc | Pause menu: settings (sensitivity, field of view, volume, fullscreen, v-sync, 3D resolution), leave session |
 
 You see everything through a gas mask. **The cracks in the glass are your health** (each hit
 cracks the side it came from); there's no health number, except a plain debug bar in the corner. Your **filter** runs down (faster when you

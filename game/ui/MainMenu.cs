@@ -22,6 +22,7 @@ public partial class MainMenu : Control
 
 		_host.Pressed += OnHostPressed;
 		_join.Pressed += OnJoinPressed;
+		GetNode<Button>("%Settings").Pressed += () => SettingsMenu.Instance?.Open();
 		_address.TextSubmitted += _ => OnJoinPressed();
 	}
 

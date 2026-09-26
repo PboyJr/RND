@@ -164,6 +164,7 @@ public partial class Player : CharacterBody3D
 	private float _reviveProgress;
 	private MultiplayerSynchronizer _sync;
 	private bool _reporting = true;
+	private float _appliedFov;
 
 	// Per-slot "ready again at" times. The owner uses theirs for the HUD; the host keeps its own to validate throws.
 	private readonly double[] _readyAt = new double[MaxSlots];
@@ -257,8 +258,9 @@ public partial class Player : CharacterBody3D
 
 		if (@event is InputEventMouseMotion motion)
 		{
-			RotateY(-motion.Relative.X * MouseSensitivity);
-			float pitch = _head.Rotation.X - motion.Relative.Y * MouseSensitivity;
+			float sensitivity = MouseSensitivity * (Settings.Instance?.MouseSensitivity ?? 1f);
+			RotateY(-motion.Relative.X * sensitivity);
+			float pitch = _head.Rotation.X - motion.Relative.Y * sensitivity;
 			_head.Rotation = new Vector3(Mathf.Clamp(pitch, -1.5f, 1.5f), 0, 0);
 			return;
 		}
@@ -291,6 +293,11 @@ public partial class Player : CharacterBody3D
 		// Everyone sees the equipped flask in hand, and its acid refilling as it recharges.
 		_handItem.Visible = GetItem(SelectedSlot) != null && !IsDead;
 		_handLiquid.Fill = _handFullFill * SelectedItemCharge;
+
+		// Field of view from the settings, only when it changes (so something else can zoom the camera).
+		float fov = Settings.Instance?.FieldOfView ?? _camera.Fov;
+		if (IsMultiplayerAuthority() && fov != _appliedFov)
+			_camera.Fov = _appliedFov = fov;
 	}
 
 	public override void _PhysicsProcess(double delta)

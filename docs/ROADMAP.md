@@ -146,8 +146,10 @@ through the chambers under pressure → pass or fail → reward → go again.
 The team asked for "all of it": the hurdles we hadn't tackled yet, worked through in this order.
 
 1. [x] **Network hardening** (details below)
-2. [ ] **A build anyone can run:** export preset, CI (build, smoke test, Windows zip on every
-       push), settings menu (sensitivity, volume, fullscreen, graphics) saved to disk
+2. [x] **A build anyone can run:** Windows export preset, CI (build, both smoke tests, Windows
+       build to download on every push), settings menu (sensitivity, field of view, three
+       volumes, fullscreen, v-sync, 3D resolution) saved to disk. *Still to see:* the first CI run
+       (after the branch is pushed) and a local export (needs the ~1 GB export templates)
 3. [ ] **Rewards and saving:** the run pays out into the local profile (M8's next item)
 4. [ ] **Enemy AI v3:** noises carry who made them, waiting at shut doors or finding another way,
        several enemies sharing what they notice

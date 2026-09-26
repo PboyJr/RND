@@ -33,6 +33,7 @@ const SCENES := [
 	"res://ui/main_menu.tscn",
 	"res://ui/hud.tscn",
 	"res://ui/visor_hud.tscn",
+	"res://ui/settings_menu.tscn",
 ]
 
 var _role := ""
@@ -94,6 +95,7 @@ func _run_scenes() -> void:
 		await _frames(1)
 
 	_check_audio(OS.get_user_data_dir(), false)
+	_check_settings()
 
 	# Offline, we're the host (peer 1), so the level should spawn us and simulate props.
 	var level := (load("res://levels/test_level.tscn") as PackedScene).instantiate()
@@ -305,6 +307,26 @@ func _check_audio(out: String, verbose: bool) -> void:
 		_check(level.y > 0.001, "audio: %s is near silent (rms %.3f)" % [sound, level.y])
 	if verbose:
 		_log("wrote %d .wav files to %s" % [levels.size(), out])
+
+
+# Settings: a save / load round trip keeps the values, and applying them sets the bus volumes.
+func _check_settings() -> void:
+	var settings := get_node("/root/Settings")
+	var path := OS.get_user_data_dir().path_join("smoke_settings.cfg")
+	settings.WorldVolume = 0.5
+	settings.MouseSensitivity = 1.7
+	settings.Save(path)
+	settings.WorldVolume = 1.0
+	settings.MouseSensitivity = 1.0
+	settings.Load(path)
+	_check(is_equal_approx(settings.WorldVolume, 0.5) and is_equal_approx(settings.MouseSensitivity, 1.7), "settings: saving and loading lost values")
+	settings.Apply()
+	var world_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("World"))
+	_check(absf(world_db - linear_to_db(0.5)) < 0.01, "settings: the world volume didn't reach the World bus (%.1f dB)" % world_db)
+	settings.WorldVolume = 1.0
+	settings.MouseSensitivity = 1.0
+	settings.Apply()
+	DirAccess.remove_absolute(path)
 
 
 # Gas mask filter: drains, low gas hurts your mind (not your body), a spare refills it (once), respawning gives a fresh one.
@@ -748,6 +770,13 @@ func _run_capture() -> void:
 	health.TakeMentalDamage(22.0)
 	await _seconds(0.8)
 	await _screenshot(out.path_join("visor_5_blood.png"))
+
+	# The settings panel over the game (hidden again without Close, which would save to the real file).
+	var settings_menu := _main.get_node("UI/SettingsMenu")
+	settings_menu.Open()
+	await _seconds(0.3)
+	await _screenshot(out.path_join("settings.png"))
+	settings_menu.hide()
 	_network.Leave()
 
 

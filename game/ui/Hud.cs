@@ -62,6 +62,17 @@ public partial class Hud : Control
 
 		GetNode<Button>("%Resume").Pressed += () => SetPaused(false);
 		GetNode<Button>("%Leave").Pressed += () => Network.Instance.Leave();
+		// The settings panel takes the pause menu's place, and gives it back when it closes.
+		GetNode<Button>("%Settings").Pressed += () =>
+		{
+			_pauseMenu.Hide();
+			SettingsMenu.Instance?.Open();
+		};
+		Callable.From(() =>
+		{
+			if (SettingsMenu.Instance != null)
+				SettingsMenu.Instance.Closed += () => _pauseMenu.Visible = Visible && Input.MouseMode == Input.MouseModeEnum.Visible;
+		}).CallDeferred();
 	}
 
 	public void Open()

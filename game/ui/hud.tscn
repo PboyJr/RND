@@ -109,6 +109,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Resume"
 
+[node name="Settings" type="Button" parent="PauseMenu/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Settings"
+
 [node name="Leave" type="Button" parent="PauseMenu/VBox"]
 unique_name_in_owner = true
 layout_mode = 2

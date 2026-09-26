@@ -734,6 +734,42 @@ shape lies down with the body (it was an invisible 1.8 m pillar), so it still we
 network test the physics pushing two overlapping players apart shoved one through the floor. Being
 able to block or stand on teammates can come back later as a deliberate mechanic.
 
+## 2026-09-25: Settings are an autoload; the panel is one table
+
+**Decision:** `core/Settings.cs` (autoload `Settings`) holds mouse sensitivity (a multiplier on
+`Player.MouseSensitivity`), field of view, master / world / in-mask volume, fullscreen, v-sync and
+3D resolution scale. It loads `user://settings.cfg` (a `ConfigFile`) at startup and applies what the
+engine needs (bus volumes, window mode, v-sync, `Viewport.Scaling3DScale`); the player reads
+sensitivity live and field of view whenever it changes. `ui/settings_menu.tscn` (one instance on
+`Main/UI`, `SettingsMenu.Instance`) builds its rows from a table in `SettingsMenu.cs`, applies every
+change at once and saves when it closes. It opens from the main menu and the pause menu (taking the
+pause menu's place until it closes). The F2–F7 debug switches stay separate and unsaved.
+
+**Why:** mouse sensitivity was a hard-coded export, and there was no volume, window or graphics
+option at all: the first things a playtester asks for. The 3D resolution scale is the cheap lever
+for weak GPUs (the visor, outlines and cel shading have never been tried on one).
+
+**How we verified it:** the offline smoke test saves, reloads and applies settings (the world
+volume must reach the World bus) and loads the panel; the capture role screenshots it over the game.
+
+## 2026-09-25: Windows export preset and CI on every push
+
+**Decision:**
+- `game/export_presets.cfg` has one preset, **Windows** (x86_64, `.pck` embedded, tests excluded),
+  exporting to `builds/windows/RND.exe` (gitignored). With .NET, the exe sits next to a
+  `data_RND_windows_x86_64` folder; ship the whole folder.
+- `.github/workflows/build.yml` runs on every push and pull request (Ubuntu): downloads Godot 4.7
+  .NET and its export templates (cached), builds the C# project, imports assets, runs the offline
+  smoke test and the network test (2 clients at 150 ms / 2% loss), then exports the Windows build
+  and uploads it as the run's `RND-windows` artifact. Client logs are kept if the network test fails.
+
+**Why:** nobody outside this machine could run the game, and nothing checked that a push didn't
+break it.
+
+**Not yet verified:** the workflow has never run (it runs once the branch is pushed), and no build
+has been exported locally, because the export templates (about 1 GB) aren't installed on the dev
+machine. The preset itself loads: a local export stops only at the missing templates.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -744,6 +780,7 @@ Things the prototype does on purpose that we'll need to revisit:
 - Walking into props doesn't push them (clients see frozen copies). Grabbing is the only way to
   move them.
 - No crouch or stamina yet.
+- Settings have no key rebinding and no graphics presets beyond the 3D resolution scale.
 - Player movement is still client-authoritative. With combat, a hacked client could teleport or
   speed-hack away from the evil guy. Fine for co-op; revisit before PvP (player monsters).
 - Building the navmesh from CSG prints a Godot warning ("had to parse RenderingServer meshes at

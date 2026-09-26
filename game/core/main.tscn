@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://maze/MazeRun.cs" id="14_run"]
 [ext_resource type="PackedScene" path="res://maze/chamber_crates.tscn" id="15_crates"]
 [ext_resource type="PackedScene" path="res://maze/chamber_ledge.tscn" id="16_ledge"]
+[ext_resource type="PackedScene" path="res://ui/settings_menu.tscn" id="17_settings"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
 render_priority = 0
@@ -99,3 +100,5 @@ Toon = NodePath("../../ToonStyle")
 Visor = NodePath("../../PostFX/Visor")
 
 [node name="MainMenu" parent="UI" unique_id=614901885 instance=ExtResource("7_menu")]
+
+[node name="SettingsMenu" parent="UI" instance=ExtResource("17_settings")]

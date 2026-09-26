@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 Network="*res://core/Network.cs"
+Settings="*res://core/Settings.cs"
 
 [display]
 
