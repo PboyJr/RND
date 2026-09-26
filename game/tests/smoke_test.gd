@@ -2,8 +2,11 @@ extends Node
 
 ## Headless smoke test. Run from the game/ folder:
 ##   godot --headless res://tests/smoke_test.tscn -- --role=scenes
-##   godot --headless res://tests/smoke_test.tscn -- --role=host     (start first)
-##   godot --headless res://tests/smoke_test.tscn -- --role=client
+##   godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --ping=150 --jitter=20 --loss=2
+##     (add --steam=1 to play it over Steam's sockets instead of ENet; Steam must be running)
+## The network role hosts and starts its own clients (the last joins mid-run), optionally behind a
+## fake bad connection, and plays the sandbox and a whole maze run (see net_suite.gd). Client logs
+## go to --out. By hand, in two terminals: --role=host (first), then --role=client.
 ## Prints "SMOKE PASS" or "SMOKE FAIL: ..." lines and exits with 0 / 1.
 ## Visual check (needs a real window, so no --headless): saves visor screenshots to --out.
 ##   godot --resolution 1280x720 res://tests/smoke_test.tscn -- --role=capture --out=C:/some/folder
@@ -11,11 +14,13 @@ extends Node
 ##   godot --headless res://tests/smoke_test.tscn -- --role=audio --out=C:/some/folder
 
 const PORT := 17777
-const TIMEOUT := 90.0
+const TIMEOUT := 150.0 # the offline suite takes about 70 s on the dev machine
 const SCENES := [
 	"res://core/main.tscn",
 	"res://levels/test_level.tscn",
 	"res://maze/test_chamber.tscn",
+	"res://maze/chamber_crates.tscn",
+	"res://maze/chamber_ledge.tscn",
 	"res://maze/pressure_plate.tscn",
 	"res://maze/chamber_door.tscn",
 	"res://maze/chamber_button.tscn",
@@ -29,6 +34,7 @@ const SCENES := [
 	"res://ui/main_menu.tscn",
 	"res://ui/hud.tscn",
 	"res://ui/visor_hud.tscn",
+	"res://ui/settings_menu.tscn",
 ]
 
 var _role := ""
@@ -37,6 +43,7 @@ var _finished := false
 var _main: Node
 var _network: Node
 var _errors := ErrorCatcher.new()
+var _proxy # LagProxy, when a client plays over a fake internet connection
 
 
 # A script error or C# exception only aborts the function it happens in, so the run carries on and
@@ -58,14 +65,23 @@ class ErrorCatcher extends Logger:
 
 func _ready() -> void:
 	OS.add_logger(_errors)
+	# Headless Godot runs uncapped, so every test process spins a core flat out. With a host and
+	# several clients on one machine they starved each other: a client could go a second without a
+	# frame, so the host didn't hear where it was. Players have v-sync; tests get a cap.
+	Engine.max_fps = 120
 	_role = _arg("role", "scenes")
 	_network = get_node("/root/Network")
-	get_tree().create_timer(TIMEOUT).timeout.connect(func(): _fail("timed out"); _finish())
+	# A profile of the test's own (never the player's real one), fresh every run.
+	var profile_path := "user://smoke_profile_%s_%s.json" % [_role, _arg("index", "0")]
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(profile_path))
+	get_node("/root/ProfileStore").Path = profile_path
+	var timeout := TIMEOUT if _role in ["scenes", "capture", "audio"] else 600.0
+	get_tree().create_timer(float(_arg("timeout", str(timeout)))).timeout.connect(func(): _fail("timed out"); _finish())
 
 	match _role:
 		"scenes": await _run_scenes()
-		"host": await _run_host()
-		"client": await _run_client()
+		"host", "network", "client": await _run_network()
+		"generator": await _run_offline_generated(range(1, int(_arg("seeds", "10")) + 1) if _arg("seed", "") == "" else [int(_arg("seed", "1"))])
 		"capture": await _run_capture()
 		"audio": _check_audio(_arg("out", OS.get_user_data_dir()), true)
 		_: _fail("unknown role '%s'" % _role)
@@ -89,6 +105,7 @@ func _run_scenes() -> void:
 		await _frames(1)
 
 	_check_audio(OS.get_user_data_dir(), false)
+	_check_settings()
 
 	# Offline, we're the host (peer 1), so the level should spawn us and simulate props.
 	var level := (load("res://levels/test_level.tscn") as PackedScene).instantiate()
@@ -103,11 +120,15 @@ func _run_scenes() -> void:
 	if player != null:
 		await _run_offline_combat(level, player)
 		await _run_offline_ai(level, player)
+		await _run_offline_pack(level, player)
 		await _run_offline_filter(level, player)
 		await _run_offline_liquid(level)
 	level.queue_free()
 	await _frames(2)
 	await _run_offline_chamber()
+	await _run_offline_chambers()
+	await _run_offline_ambush()
+	await _run_offline_generated([1])
 	await _run_offline_run()
 
 
@@ -220,6 +241,7 @@ func _run_offline_ai(level: Node, player: Node3D) -> void:
 	var searching := await _wait_until(func(): return e.Mood == Mood.SUSPICIOUS, 3.0)
 	var goal: Vector3 = agent_target.call(e)
 	_check(searching and goal.distance_to(last_seen) < 1.5, "memory: after losing us it should search our last seen spot %s, went for %s" % [last_seen, goal])
+	_check(level.TimesLostNear(last_seen) == 1, "habits: losing us didn't get remembered (%d)" % level.TimesLostNear(last_seen))
 
 	# ...then gives up if it finds nothing.
 	player.global_position = Vector3(10, 0, 10) # far out of sight
@@ -283,6 +305,71 @@ func _run_offline_ai(level: Node, player: Node3D) -> void:
 	_log("AI v2: vision, memory, search, hearing, drop links (%d), shoving all behave" % links.size())
 
 
+# AI v3, the pack and its habits. One evil guy spots us and growls: a second one that heard the growl
+# (but can't see us) comes for *us*, not for the one that growled. And a spot where players keep
+# getting away is the first place it patrols.
+func _run_offline_pack(level: Node, player: Node3D) -> void:
+	var agent_target := func(e: Node): return (e.get_node("NavigationAgent3D") as NavigationAgent3D).target_position
+	var a := await _fresh_enemy(level)
+	a.WanderSpeed = 0.0
+	a.rotation = Vector3(0, PI, 0) # facing +z, into the room
+	var b := (load("res://enemies/enemy.tscn") as PackedScene).instantiate() as Node3D
+	b.position = Vector3(8, 0.05, -8)
+	b.rotation = Vector3(0, -PI / 2.0, 0) # facing the east wall, away from us
+	b.WanderSpeed = 0.0
+	level.get_node("Enemies").add_child(b, true) # a readable name, so the spawner can replicate it
+	await _frames(3)
+	player.global_position = a.global_position + Vector3(0, 0, 5) # in front of the first one
+	_check(await _wait_until(func(): return a.Mood == Mood.HUNTING, 3.0), "pack: the first evil guy didn't spot us")
+	var heard := await _wait_until(func(): return b.Mood == Mood.SUSPICIOUS, 1.0)
+	var goal: Vector3 = agent_target.call(b)
+	_check(heard and goal.distance_to(player.global_position) < 1.5, "pack: the second evil guy should head for us %s after the growl, went for %s (the growler is at %s)" % [player.global_position, goal, a.global_position])
+	b.queue_free()
+
+	# Habits: players got away twice near the table; once it's calm again, it patrols there first.
+	var spot := Vector3(6, 0, -3.5)
+	level.RememberLostAt(spot)
+	level.RememberLostAt(spot + Vector3(0.5, 0, 0))
+	var e := await _fresh_enemy(level)
+	player.global_position = Vector3(-10, 0, 10) # far away, out of sight
+	var patrolled := await _wait_until(func(): return (agent_target.call(e) as Vector3).distance_to(spot) < 1.5, 6.0)
+	_check(patrolled, "habits: didn't go and check the spot where players keep getting away (went for %s)" % agent_target.call(e))
+	_log("AI v3: the pack converges on a growl's lead, and it patrols where players got away")
+
+
+# A shut door between it and something it heard: it waits by the door (listening) instead of
+# wandering off, and goes through the moment the door opens.
+func _run_offline_ambush() -> void:
+	var level := (load("res://maze/test_chamber.tscn") as PackedScene).instantiate()
+	level.EnemyReleaseDelay = 0.3
+	add_child(level)
+	var enemies := level.get_node("Enemies")
+	if not _check(await _wait_until(func(): return enemies.get_child_count() == 1 and level.get_node("Navigation").navigation_mesh.get_polygon_count() > 0, 4.0), "ambush: no evil guy or navmesh"):
+		level.queue_free()
+		return
+	await _seconds(0.3)
+	var e := enemies.get_child(0) as Node3D
+	var player := level.get_node("Players/1") as Node3D
+	var door := level.get_node("Navigation/Geometry/ClosetDoor") as Node3D
+	player.global_position = Vector3(-7.9, 0.05, 1.0) # in the closet, door shut
+	e.global_position = Vector3(-3, 0.05, 1.5)
+	e.WanderSpeed = 0.0
+	await _frames(3)
+	level.EmitNoise(player.global_position, 14.0) # something in there made a noise
+	await _seconds(4.0)
+	var waiting: bool = e.Mood == Mood.SUSPICIOUS and e.global_position.distance_to(door.global_position - Vector3(0, 1.5, 0)) < 2.5
+	_check(waiting, "ambush: should be waiting by the closet door, is at %s (mood %d)" % [e.global_position, e.Mood])
+	await _seconds(3.0)
+	_check(e.global_position.distance_to(door.global_position - Vector3(0, 1.5, 0)) < 2.5, "ambush: gave up waiting by the door too soon (at %s)" % e.global_position)
+
+	level.get_node("Navigation/Geometry/ButtonInside").RequestPress() # we open the door from inside
+	var came_in := await _wait_until(func(): return e.global_position.x < -6.3 or e.Mood == Mood.HUNTING, 6.0)
+	_check(came_in, "ambush: didn't come through when the door opened (at %s, mood %d)" % [e.global_position, e.Mood])
+	_log("AI v3: waits at a shut door, comes through when it opens")
+	level.queue_free()
+	await _frames(2)
+
+
 # Audio: the buses exist (the World bus muffles through the mask), and every procedural sound renders
 # at a sane level: audible, not clipping. The .wavs land in `out` for listening.
 func _check_audio(out: String, verbose: bool) -> void:
@@ -299,6 +386,26 @@ func _check_audio(out: String, verbose: bool) -> void:
 		_check(level.y > 0.001, "audio: %s is near silent (rms %.3f)" % [sound, level.y])
 	if verbose:
 		_log("wrote %d .wav files to %s" % [levels.size(), out])
+
+
+# Settings: a save / load round trip keeps the values, and applying them sets the bus volumes.
+func _check_settings() -> void:
+	var settings := get_node("/root/Settings")
+	var path := OS.get_user_data_dir().path_join("smoke_settings.cfg")
+	settings.WorldVolume = 0.5
+	settings.MouseSensitivity = 1.7
+	settings.Save(path)
+	settings.WorldVolume = 1.0
+	settings.MouseSensitivity = 1.0
+	settings.Load(path)
+	_check(is_equal_approx(settings.WorldVolume, 0.5) and is_equal_approx(settings.MouseSensitivity, 1.7), "settings: saving and loading lost values")
+	settings.Apply()
+	var world_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("World"))
+	_check(absf(world_db - linear_to_db(0.5)) < 0.01, "settings: the world volume didn't reach the World bus (%.1f dB)" % world_db)
+	settings.WorldVolume = 1.0
+	settings.MouseSensitivity = 1.0
+	settings.Apply()
+	DirAccess.remove_absolute(path)
 
 
 # Gas mask filter: drains, low gas hurts your mind (not your body), a spare refills it (once), respawning gives a fresh one.
@@ -392,6 +499,231 @@ func _run_offline_chamber() -> void:
 	await _frames(2)
 
 
+# Every chamber in the maze run: you spawn in its start corridor, the evil guy could reach you there,
+# and its exit is shut until the puzzle is solved. The newer chambers get solved here too.
+func _run_offline_chambers() -> void:
+	var main := (load("res://core/main.tscn") as PackedScene).instantiate()
+	var chambers: Array = main.get_node("Run").Chambers
+	main.free()
+	_check(chambers.size() >= 3, "chambers: a maze run has only %d chambers to pick from" % chambers.size())
+	for packed: PackedScene in chambers:
+		var chamber := packed.resource_path.get_file().get_basename()
+		var level := packed.instantiate()
+		level.EnemyReleaseDelay = 999.0 # keep him out of the puzzle checks
+		add_child(level)
+		await _seconds(1.0)
+		var player := level.get_node_or_null("Players/1") as Node3D
+		var exit := level.get_node("Exit") as Node3D
+		var exit_floor := exit.global_position - Vector3(0, 1.5, 0)
+		if _check(player != null, "%s: didn't spawn the local player" % chamber):
+			_check(player.is_on_floor(), "%s: player isn't standing on the floor" % chamber)
+			_check(player.global_position.distance_to(exit.global_position) > 10.0, "%s: player spawned near the exit" % chamber)
+			_check(not exit.IsComplete, "%s: passed before anyone reached the exit" % chamber)
+			_check(not _can_path(level, player.global_position, exit_floor), "%s: the exit is open from the start" % chamber)
+			var lair := (level.get_node("EnemySpawnPoints").get_child(0) as Node3D).global_position
+			_check(_can_path(level, lair, player.global_position), "%s: the evil guy couldn't reach the start corridor" % chamber)
+			for prop in level.get_node("Props").get_children():
+				_check(prop.global_position.y > -0.5, "%s: %s fell through the floor" % [chamber, prop.name])
+			match chamber:
+				"chamber_crates": await _solve_crates(level, exit_floor)
+				"chamber_ledge": await _solve_ledge(level, player, exit_floor)
+		level.queue_free()
+		await _frames(2)
+
+
+# Generated chambers: for each seed at easy, medium and hard, the room builds; you spawn in the start
+# corridor; the exit is shut; the evil guy can reach you; everything its plan needs is reachable; and
+# following the plan opens the exit. The same seed builds the same room twice.
+func _run_offline_generated(seeds: Array) -> void:
+	_start_main()
+	var run := _main.get_node("Run")
+	var first: Node = run.BuildGenerated(7, 0.8)
+	var again: Node = run.BuildGenerated(7, 0.8)
+	var layout := func(level: Node): return level.get_node("Props").get_children().map(func(p): return [str(p.name), p.position])
+	_check(layout.call(first) == layout.call(again) and first.get_meta("plan") == again.get_meta("plan"), "generated: seed 7 built two different rooms")
+	first.free()
+	again.free()
+	var solved := 0
+	for difficulty in ([0.0, 0.5, 1.0] if _arg("difficulty", "") == "" else [float(_arg("difficulty", "0"))]):
+		for seed in seeds:
+			var level: Node3D = run.BuildGenerated(seed, difficulty)
+			level.EnemyReleaseDelay = 999.0
+			add_child(level)
+			if await _solve_generated(level):
+				solved += 1
+			level.queue_free()
+			await _frames(2)
+	_log("generated: solved %d of %d chambers" % [solved, seeds.size() * 3])
+	_main.queue_free()
+	_main = null
+	await _frames(2)
+
+
+func _solve_generated(level: Node3D) -> bool:
+	var plan: Dictionary = level.get_meta("plan")
+	var name := "generated %d at %.1f %s" % [plan["seed"], plan["difficulty"], plan["pieces"]]
+	var failures := _failures.size()
+	var nav := level.get_node("Navigation") as NavigationRegion3D
+	if not _check(await _wait_until(func(): return nav.navigation_mesh.get_polygon_count() > 0 and level.has_node("Players/1"), 5.0), "%s: no navmesh or player" % name):
+		return false
+	await _seconds(0.8)
+	var player := level.get_node("Players/1") as Node3D
+	var start := player.global_position
+	var exit_floor := (level.get_node("Exit") as Node3D).global_position - Vector3(0, 1.5, 0)
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
+	_check(player.is_on_floor() and start.distance_to(exit_floor) > 8.0, "%s: didn't spawn on the floor of the start corridor (%s)" % [name, start])
+	_check(not _can_path(level, start, exit_floor), "%s: the exit is open from the start" % name)
+	for lair in level.get_node("EnemySpawnPoints").get_children():
+		_check(_can_path(level, lair.global_position, start), "%s: the evil guy at %s can't reach the start" % [name, lair.global_position])
+	for prop in level.get_node("Props").get_children():
+		_check(prop.global_position.y > -0.5, "%s: %s fell through the floor" % [name, prop.name])
+
+	if plan.has("closet"):
+		var closet: Dictionary = plan["closet"]
+		var button := level.get_node(closet["button"]) as Node3D
+		player.global_position = button.global_position + Vector3(0, 0.05, 1.0)
+		await _frames(2)
+		button.RequestPress()
+		var case := level.get_node(closet["holds"]) as Node3D
+		var opened := await _wait_until(func(): return _can_path(level, start, case.global_position * Vector3(1, 0, 1)), 4.0)
+		_check(opened, "%s: pressing the closet button didn't let anyone reach the case" % name)
+
+	for entry in plan["plates"]:
+		var plate := level.get_node(entry["plate"]) as Node3D
+		var props: Array = entry["props"]
+		var spots := _plate_spots(level, props)
+		for i in props.size():
+			var prop := level.get_node(props[i]) as RigidBody3D
+			if not plan.has("closet") or props[i] != plan["closet"]["holds"]:
+				_check(_can_path(level, start, prop.global_position * Vector3(1, 0, 1)), "%s: can't walk to %s at %s" % [name, props[i], prop.global_position])
+			prop.global_position = plate.global_position + spots[i]
+			prop.linear_velocity = Vector3.ZERO
+			prop.angular_velocity = Vector3.ZERO
+			prop.rotation = Vector3.ZERO
+		_check(await _wait_until(func(): return plate.Pressed, 3.0), "%s: its props (%s) didn't hold %s down" % [name, props, entry["plate"]])
+
+	if plan.has("ledge"):
+		var ledge: Dictionary = plan["ledge"]
+		var button := level.get_node(ledge["button"]) as Node3D
+		var from: Vector3 = ledge["throw_from"] + Vector3(0, 1.7, 0)
+		_check(_can_path(level, start, ledge["throw_from"]), "%s: can't walk to the spot to throw from" % name)
+		var jar := level.get_node("Props/JarA") as RigidBody3D
+		var target := (button.get_node("HitZone") as Node3D).global_position
+		var hit := false
+		for attempt in 5:
+			var aim := target + (target - from).slide(Vector3.UP).normalized() * 0.25 * attempt
+			jar.global_position = from
+			jar.angular_velocity = Vector3.ZERO
+			jar.linear_velocity = _lob(from, aim, 12.0)
+			hit = await _wait_until(func(): return button.Pressed, 2.0)
+			if hit:
+				break
+		_check(hit, "%s: a jar thrown from %s never hit the ledge button" % [name, ledge["throw_from"]])
+
+	var open := await _wait_until(func(): return door.IsOpen and _can_path(level, start, exit_floor), 4.0)
+	_check(open, "%s: following the plan didn't open the way out (door open %s)" % [name, door.IsOpen])
+	if _failures.size() > failures:
+		var verts: PackedVector3Array = nav.navigation_mesh.get_vertices()
+		var box := AABB(verts[0], Vector3.ZERO) if not verts.is_empty() else AABB()
+		for v in verts:
+			box = box.expand(v)
+		_log("%s: navmesh %d polygons over %s" % [name, nav.navigation_mesh.get_polygon_count(), box])
+		var map := level.get_world_3d().navigation_map
+		_log("  map iteration %d, regions %s, ours %s" % [NavigationServer3D.map_get_iteration_id(map), NavigationServer3D.map_get_regions(map), nav.get_rid()])
+		_log("  start %s (navmesh %s); path to the room's middle: %s" % [start, NavigationServer3D.map_get_closest_point(map, start), NavigationServer3D.map_get_path(map, start, Vector3(0, 0, 0), true)])
+		_log("%s: plan %s" % [name, plan])
+		_log("  props: %s" % [level.get_node("Props").get_children().map(func(p): return "%s %s" % [p.name, p.global_position.snapped(Vector3.ONE * 0.1)])])
+		_log("  plates: %s" % [level.get_children().filter(func(n): return n is Area3D and str(n.name).begins_with("Plate")).map(func(p): return "%s %s pressed %s" % [p.name, p.global_position, p.Pressed])])
+	return _failures.size() == failures
+
+
+# Where each prop goes on its plate: the case and a crate side by side, or crates in a grid.
+func _plate_spots(level: Node, props: Array) -> Array:
+	var cases := props.filter(func(p): return (level.get_node(p) as RigidBody3D).mass > 20.0)
+	if not cases.is_empty():
+		return props.map(func(p): return Vector3(-0.28, 0.55, 0) if p == cases[0] else Vector3(0.52, 0.35, 0))
+	var grid := [Vector3(-0.32, 0.35, -0.32), Vector3(0.32, 0.35, -0.32), Vector3(-0.32, 0.35, 0.32), Vector3(0.32, 0.35, 0.32)]
+	if props.size() > 4:
+		grid = [Vector3(-0.62, 0.35, -0.32), Vector3(0, 0.35, -0.32), Vector3(0.62, 0.35, -0.32), Vector3(-0.62, 0.35, 0.32), Vector3(0, 0.35, 0.32), Vector3(0.62, 0.35, 0.32)]
+	return grid.slice(0, props.size())
+
+
+# The easy chamber: a jar or three crates don't hold the plate, four crates do.
+func _solve_crates(level: Node, exit_floor: Vector3) -> void:
+	var plate := level.get_node("Plate") as Node3D
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
+	var jar := level.get_node("Props/JarA") as RigidBody3D
+	jar.global_position = plate.global_position + Vector3(0, 0.3, 0)
+	await _seconds(0.5)
+	_check(not plate.Pressed, "crates: a jar held the plate down")
+	jar.global_position = plate.global_position + Vector3(2.5, 0.3, 0)
+	var corners := [Vector3(-0.35, 0.35, -0.35), Vector3(0.35, 0.35, -0.35), Vector3(-0.35, 0.35, 0.35), Vector3(0.35, 0.35, 0.35)]
+	for i in 4:
+		var crate := level.get_node("Props").get_child(i) as RigidBody3D
+		crate.global_position = plate.global_position + corners[i]
+		crate.linear_velocity = Vector3.ZERO
+		if i == 2:
+			await _seconds(0.5)
+			_check(not plate.Pressed, "crates: three crates held the plate down")
+	_check(await _wait_until(func(): return plate.Pressed and door.IsOpen, 2.0), "crates: four crates on the plate didn't open the exit")
+	_check(await _wait_until(func(): return _can_path(level, Vector3.ZERO, exit_floor), 3.0), "crates: no path through the open exit")
+
+
+# The hard chamber: the exit needs the plate held *and* the button up on the ledge, which is out of
+# reach from the floor. A jar lobbed from by the exit door (a real throw's speed) presses it.
+func _solve_ledge(level: Node, player: Node3D, exit_floor: Vector3) -> void:
+	var plate := level.get_node("Plate") as Node3D
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
+	var button := level.get_node("Navigation/Geometry/LedgeButton") as Node3D
+	var case := level.get_node("Props/CaseA") as RigidBody3D
+	var jar := level.get_node("Props/JarA") as RigidBody3D
+
+	var start := player.global_position
+	player.global_position = Vector3(4.1, 0.05, 0) # at the foot of the ledge, under the button
+	await _frames(2)
+	button.RequestPress()
+	await _frames(2)
+	_check(not button.Pressed, "ledge: pressed the button from the floor")
+	player.global_position = start
+
+	case.global_position = plate.global_position + Vector3(0, 0.7, 0)
+	_check(await _wait_until(func(): return plate.Pressed, 2.0), "ledge: the case didn't press the plate")
+	await _seconds(0.5)
+	_check(not door.IsOpen, "ledge: the plate alone opened the exit")
+
+	var from := Vector3(0, 1.7, -5.5)
+	var target := (button.get_node("HitZone") as Node3D).global_position
+	var hit := false
+	for attempt in 4: # aim a little long each time, like a player would (air drag)
+		var aim := target + (target - from).slide(Vector3.UP).normalized() * 0.3 * attempt
+		jar.global_position = from
+		jar.angular_velocity = Vector3.ZERO
+		jar.linear_velocity = _lob(from, aim, 12.0)
+		hit = await _wait_until(func(): return button.Pressed, 2.0)
+		if hit:
+			_log("ledge: a lobbed jar hit the button on throw %d" % (attempt + 1))
+			break
+	if not _check(hit, "ledge: a jar lobbed from the exit door never hit the button"):
+		return
+	_check(await _wait_until(func(): return door.IsOpen, 0.5), "ledge: plate + button didn't open the exit")
+	_check(await _wait_until(func(): return _can_path(level, Vector3(0, 0, -5), exit_floor), 3.0), "ledge: no path through the open exit")
+	_check(await _wait_until(func(): return not door.IsOpen, 6.0), "ledge: the exit stayed open after the button popped up")
+
+
+# Launch velocity at this speed that lands on the target (the flatter of the two arcs, no drag).
+func _lob(from: Vector3, to: Vector3, speed: float) -> Vector3:
+	var flat := (to - from).slide(Vector3.UP)
+	var x := flat.length()
+	var y := to.y - from.y
+	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+	var v2 := speed * speed
+	var disc := v2 * v2 - g * (g * x * x + 2.0 * y * v2)
+	if disc < 0.0:
+		return Vector3.ZERO
+	var angle := atan((v2 - sqrt(disc)) / (g * x))
+	return flat.normalized() * speed * cos(angle) + Vector3.UP * speed * sin(angle)
+
+
 # Whether the host's navmesh has a path between two floor points (the end lands on the target).
 func _can_path(level: Node3D, from: Vector3, to: Vector3) -> bool:
 	var path := NavigationServer3D.map_get_path(level.get_world_3d().navigation_map, from, to, true)
@@ -463,6 +795,7 @@ func _run_offline_run() -> void:
 	_start_main()
 	var run := _main.get_node("Run")
 	run.Length = 2
+	run.GeneratedShare = 0.0 # hand-built chambers, so the ramp below is predictable
 	run.PauseSeconds = 0.2
 	run.ResultSeconds = 0.5
 	run.Start()
@@ -470,6 +803,9 @@ func _run_offline_run() -> void:
 		var loaded := await _wait_until(func(): return run.Chamber == test and _players() != null and _players().has_node("1"), 3.0)
 		if not _check(loaded, "run: chamber %d never loaded" % (test + 1)):
 			break
+		# Difficulty ramps: a 2-chamber run is the easiest chamber, then the hardest.
+		var expected: PackedScene = run.Chambers[0 if test == 0 else run.Chambers.size() - 1]
+		_check(_level().scene_file_path == expected.resource_path, "run: chamber %d was %s, not %s" % [test + 1, _level().scene_file_path, expected.resource_path])
 		await _seconds(0.3)
 		_players().get_node("1").global_position = _level().get_node("Exit").global_position - Vector3(0, 1.4, 0)
 	_check(await _wait_until(func(): return run.Result == 1, 3.0), "run: passing the last chamber didn't pass the run")
@@ -480,31 +816,64 @@ func _run_offline_run() -> void:
 	health.TakeDamage(99999.0, 0)
 	_check(await _wait_until(func(): return run.Result == 2, 2.0), "run: everyone down didn't fail the run")
 	_check(health.IsDead, "run: a downed player came back on a timer in a chamber")
+	var money: int = 2 * run.PayPerChamber + run.PassBonusPay
+	var xp: int = 2 * run.XpPerChamber + run.PassBonusXp
 	_main.queue_free()
 	_main = null
 	await _frames(2)
+	_check_profile(money, xp)
 
 
-# The host's player lies dead (see _run_host). A teammate next to it revives it at half health where it
-# fell; from across the room, nothing happens.
-func _run_network_revive(me: Node3D) -> void:
-	var host_player := _players().get_node("1") as Node3D
-	var health := host_player.get_node("Health")
-	if not _check(health.IsDead, "revive: the host's player should be lying dead"):
+# The profile: both runs above counted when they started; the passed run paid 2 chambers + the
+# bonus, the failed one nothing. It's on disk, and an unreadable file is set aside, not fatal.
+func _check_profile(money: int, xp: int) -> void:
+	var store := get_node("/root/ProfileStore")
+	_check(store.RunCount == 2 and store.LastRun == 2, "profile: 2 runs started, but it counted %d (last run %d)" % [store.RunCount, store.LastRun])
+	_check(store.Money == money, "profile: the runs paid %d money, not %d" % [store.Money, money])
+	_check(store.Level == 2 and store.Xp == xp - 100, "profile: %d XP should make level 2 with %d over (level %d, %d XP)" % [xp, xp - 100, store.Level, store.Xp])
+	store.Reload()
+	_check(store.Money == money, "profile: the money wasn't saved (%d after reloading)" % store.Money)
+
+	var path: String = store.Path
+	var bad := "user://smoke_profile_bad.json"
+	var file := FileAccess.open(bad, FileAccess.WRITE)
+	file.store_string("{ this isn't json")
+	file.close()
+	store.Path = bad
+	store.Reload()
+	_check(store.Money == 0 and store.Level == 1, "profile: an unreadable file didn't give a fresh profile")
+	_check(FileAccess.file_exists(bad + ".bad"), "profile: the unreadable file wasn't kept aside")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(bad + ".bad"))
+	store.Path = path
+	store.Reload()
+
+
+# Hosting, or joining as a client (see net_suite.gd). The suite is a child node so its RPCs have the
+# same path on every peer.
+func _run_network() -> void:
+	var net: Node = preload("res://tests/net_suite.gd").new()
+	net.name = "Net"
+	net.t = self
+	net.index = int(_arg("index", "0"))
+	net.total = int(_arg("clients", "3" if _role == "network" else "1"))
+	net.ping = float(_arg("ping", "0"))
+	if not _check(net.total <= net.MAX_CLIENTS, "the network test plays at most %d clients" % net.MAX_CLIENTS):
 		return
-	if me.global_position.distance_to(host_player.global_position) > 4.0:
-		host_player.rpc_id(1, "RequestRevive")
-		await _seconds(0.5)
-		_check(health.IsDead, "revive: revived from %.1f m away" % me.global_position.distance_to(host_player.global_position))
-	var fell_at := host_player.global_position
-	me.global_position = fell_at + Vector3(0, 0.05, 1.2)
-	await _seconds(0.3) # let the host see us next to it
-	host_player.rpc_id(1, "RequestRevive")
-	_check(await _wait_until(func(): return not health.IsDead, 2.0), "revive: standing next to it didn't revive the host's player")
-	_check(absf(health.Current - 50.0) < 0.1, "revive: came back with %.0f health, not 50" % health.Current)
-	await _seconds(0.3)
-	_check(host_player.global_position.distance_to(fell_at) < 1.0, "revive: the revived player was moved to a spawn point")
-	_log("revive: host's player back at %.0f health where it fell" % health.Current)
+	# --steam: the same test over Steam's networking sockets (Steam must be running) instead of ENet.
+	if _arg("steam", "0") == "1":
+		_network.DirectOverSteam = true
+		if not _check(_network.StartSteam(), "--steam: couldn't connect to Steam (is it running?)"):
+			return
+	add_child(net)
+	match _role:
+		"network":
+			net.has_late = net.total >= 2
+			await net.run_host(true)
+		"host":
+			await net.run_host(false)
+		"client":
+			net.has_late = _arg("late", "0") == "1"
+			await net.run_client()
 
 
 # Kills whatever's there and waits for the level to spawn a fresh, calm evil guy.
@@ -517,95 +886,6 @@ func _fresh_enemy(level: Node) -> Node3D:
 	await _wait_until(func(): return enemies.get_child_count() == 1, 2.0)
 	await _frames(2)
 	return enemies.get_child(0) as Node3D
-
-
-func _run_host() -> void:
-	_start_main()
-	if not _check(_network.Host(PORT) == OK, "host: couldn't open port %d" % PORT):
-		return
-	if not _check(await _wait_until(func(): return _players() != null and _players().has_node("1"), 5.0), "host: level never loaded"):
-		return
-	# Take the host's own (idle) player out of play, so the evil guy can only lock on to the client
-	# the network checks are about. Otherwise it sometimes spots the host first and ignores the client.
-	var own := _players().get_node("1")
-	own.RespawnDelay = 999.0
-	own.get_node("Health").TakeDamage(99999.0, 0)
-	_log("hosting, waiting for a client")
-
-	if not _check(await _wait_until(func(): return not multiplayer.get_peers().is_empty(), 30.0), "host: no client connected"):
-		return
-	var client_id := multiplayer.get_peers()[0]
-	_check(await _wait_until(func(): return _players().has_node(str(client_id)), 5.0), "host: client's player not spawned")
-	_log("client %d joined" % client_id)
-
-	_check(await _wait_until(func(): return multiplayer.get_peers().is_empty(), 30.0), "host: client never left")
-	await _frames(10)
-	_check(not _players().has_node(str(client_id)), "host: client's player not removed after it left")
-	_network.Leave()
-
-
-func _run_client() -> void:
-	_start_main()
-	if not _check(_network.Join("127.0.0.1", PORT) == OK, "client: couldn't start connecting"):
-		return
-	var joined := await _wait_until(func(): return _players() != null and _players().get_child_count() >= 2, 15.0)
-	if not _check(joined, "client: level / players never replicated"):
-		return
-
-	var my_id := multiplayer.get_unique_id()
-	var me := _players().get_node_or_null(str(my_id)) as Node3D
-	if not _check(me != null, "client: own player missing"):
-		return
-	_check(me.is_multiplayer_authority(), "client: doesn't own its player")
-	_check(_players().has_node("1"), "client: host's player missing")
-	_log("joined as %d, players: %s" % [my_id, _players().get_children().map(func(p): return str(p.name))])
-
-	var jar := _level().get_node("Props/JarA") as RigidBody3D
-	_check(jar.freeze, "client: props should be frozen (the host simulates them)")
-
-	# Walk up to the jar (facing it) and grab it.
-	me.global_position = jar.global_position + Vector3(0, -0.175, 1.5)
-	await _seconds(0.5) # let the host see where we are
-	jar.rpc_id(1, "RequestGrab")
-	if not _check(await _wait_until(func(): return jar.HeldBy == my_id, 3.0), "client: host didn't confirm the grab (HeldBy=%s)" % jar.HeldBy):
-		return
-
-	await _seconds(1.0)
-	var head := me.get_node("Head") as Node3D
-	var hold_point: Vector3 = head.global_position - head.global_basis.z * me.SyncHoldDistance
-	var hold_error := jar.global_position.distance_to(hold_point)
-	_check(hold_error < 0.5, "client: held jar isn't following the hold point (off by %.2f m)" % hold_error)
-	_log("carrying jar at %s (%.2f m from hold point)" % [jar.global_position, hold_error])
-
-	var before := jar.global_position
-	jar.rpc_id(1, "RequestThrow")
-	_check(await _wait_until(func(): return jar.HeldBy == 0, 3.0), "client: throw didn't release the jar")
-	await _seconds(0.4)
-	_check(jar.global_position.z < before.z - 1.0, "client: jar didn't fly forward (z %.2f -> %.2f)" % [before.z, jar.global_position.z])
-	_log("threw jar: %s -> %s" % [before, jar.global_position])
-
-	await _run_network_filter(me)
-	await _run_network_combat(me, head)
-	await _run_network_revive(me)
-
-	_network.Leave()
-	await _frames(5)
-	_check(_level() == null, "client: level not cleared after leaving")
-
-
-# The host breathes for us (drains our filter) and replicates it; a spare canister refills it.
-func _run_network_filter(me: Node3D) -> void:
-	var respirator := me.get_node("Respirator")
-	var capacity: float = respirator.Capacity
-	_check(await _wait_until(func(): return respirator.Remaining < capacity, 3.0), "client: filter never drained (host breathing not replicating?)")
-
-	var canister := _level().get_node("Props/FilterB") as Node3D # on the table
-	me.global_position = Vector3(canister.global_position.x, 0.05, -4.5) # beside the table
-	await _seconds(0.3) # let the host see us next to it
-	canister.rpc_id(1, "RequestUse")
-	var refilled := await _wait_until(func(): return canister.Consumed and respirator.Remaining > capacity - 1.0, 2.0)
-	_check(refilled, "client: a spare filter didn't refill us and vanish (remaining %.1f, consumed %s)" % [respirator.Remaining, canister.Consumed])
-	_log("filter: drained to <%d s, spare canister refilled it" % capacity)
 
 
 # Visual + level check (needs a real window and sound): host a session, save screenshots of the visor
@@ -719,6 +999,26 @@ func _run_capture() -> void:
 	health.TakeMentalDamage(22.0)
 	await _seconds(0.8)
 	await _screenshot(out.path_join("visor_5_blood.png"))
+
+	# The settings panel over the game (hidden again without Close, which would save to the real file).
+	var settings_menu := _main.get_node("UI/SettingsMenu")
+	settings_menu.Open()
+	await _seconds(0.3)
+	await _screenshot(out.path_join("settings.png"))
+	settings_menu.hide()
+
+	# A generated chamber (seed 1 at the top difficulty: a closet and a ledge), from just inside the room.
+	_main.ChangeToGenerated(1, 1.0)
+	var built := await _wait_until(func(): return _level() != null and _level().has_meta("plan") and _players() != null and _players().has_node("1"), 5.0)
+	if _check(built, "capture: the generated chamber never loaded"):
+		await _seconds(1.0)
+		var size: Vector3 = _level().get_meta("plan")["size"]
+		var me := _players().get_node("1") as Node3D
+		me.global_position = Vector3(0, 0.05, size.z / 2.0 - 0.5)
+		me.rotation = Vector3.ZERO
+		me.get_node("Head").rotation = Vector3(-0.15, 0, 0)
+		await _seconds(0.5)
+		await _screenshot(out.path_join("generated.png"))
 	_network.Leave()
 
 
@@ -763,33 +1063,21 @@ func _brightness(image: Image) -> float:
 	return total / count
 
 
-# The host runs the evil guy and all damage. The client gets hit, then hits back.
-func _run_network_combat(me: Node3D, head: Node3D) -> void:
-	var enemies := _level().get_node("Enemies")
-	if not _check(await _wait_until(func(): return enemies.get_child_count() > 0, 5.0), "client: evil guy never replicated"):
-		return
-	var enemy := enemies.get_child(0) as Node3D
-	var enemy_health := enemy.get_node("Health")
-	var my_health := me.get_node("Health")
-
-	# Stay next to it (room-centre side, same level) until it swings: proves the host's AI picks us
-	# and its damage replicates back to us.
-	var got_hit := await _wait_until(func():
-		if me.global_position.distance_to(enemy.global_position) > 1.6:
-			var away := -enemy.global_position * Vector3(1, 0, 1)
-			me.global_position = enemy.global_position + (away.normalized() if away.length() > 1.0 else Vector3.BACK) * 1.2
-		return my_health.Current < my_health.MaxHealth, 8.0)
-	if not _check(got_hit, "client: evil guy never hurt us (host damage didn't replicate?)"):
-		return
-	_log("evil guy hit us: %.0f / %.0f" % [my_health.Current, my_health.MaxHealth])
-
-	# It stands still recovering from the swing, so a point-blank throw must land. (At range, a
-	# path-following target can legitimately dodge, which made this flaky.)
-	var start_health: float = enemy_health.Current
-	var eye := head.global_position
-	me.rpc_id(1, "RequestThrowItem", 1, eye, (enemy.global_position + Vector3.UP * 1.2 - eye).normalized())
-	_check(await _wait_until(func(): return enemy_health.Current < start_health, 2.0), "client: point-blank acid flask didn't hurt the evil guy")
-	_log("flask hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
+# The port a client joins: the host's, or a lag proxy in front of it when --ping / --loss ask for a
+# bad connection (--ping is the round trip in ms, --jitter extra ms per packet, --loss a percentage).
+func _connect_port() -> int:
+	var ping := float(_arg("ping", "0"))
+	var loss := float(_arg("loss", "0")) / 100.0
+	if ping <= 0.0 and loss <= 0.0:
+		return PORT
+	_proxy = preload("res://tests/lag_proxy.gd").new()
+	_proxy.delay_ms = ping / 2.0
+	_proxy.jitter_ms = float(_arg("jitter", "0"))
+	_proxy.loss = loss
+	var port := PORT + 100 + int(_arg("index", "0"))
+	_proxy.start(port, PORT)
+	_log("playing through a lag proxy: %.0f ms round trip, +%.0f ms jitter, %.0f%% loss" % [ping, _proxy.jitter_ms, loss * 100.0])
+	return port
 
 
 func _start_main() -> void:
@@ -850,6 +1138,10 @@ func _finish() -> void:
 	if _finished:
 		return
 	_finished = true
+	if _proxy:
+		var bytes: Vector2i = _proxy.counts()
+		_log("traffic through the proxy: %.1f KB up, %.1f KB down" % [bytes.x / 1024.0, bytes.y / 1024.0])
+		_proxy.stop()
 	OS.remove_logger(_errors)
 	for error in _errors.messages:
 		_fail("error logged: " + error)

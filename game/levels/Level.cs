@@ -17,6 +17,7 @@ namespace RND.Levels;
 public partial class Level : Node3D
 {
 	private const float ReleaseSoundRadius = 40f; // the whole chamber hears the variable arrive
+	private const float LostSpotMerge = 2.5f;
 
 	public static Level Current { get; private set; }
 
@@ -32,9 +33,11 @@ public partial class Level : Node3D
 	public Effects Effects { get; private set; }
 
 	private Node3D _players;
+	private MultiplayerSpawner _playerSpawner;
 	private Node3D _enemies;
 	private Node3D _projectiles;
 	private bool _spawningPlayers;
+	private readonly List<(Vector3 Position, int Count)> _lostSpots = new();
 
 	public IEnumerable<Enemy> Enemies => _enemies.GetChildren().OfType<Enemy>();
 
@@ -43,6 +46,8 @@ public partial class Level : Node3D
 	public override void _Ready()
 	{
 		_players = GetNode<Node3D>("Players");
+		_playerSpawner = GetNode<MultiplayerSpawner>("PlayerSpawner");
+		_playerSpawner.SpawnFunction = Callable.From<Variant, Node>(CreatePlayer); // every peer builds its copy this way
 		_enemies = GetNode<Node3D>("Enemies");
 		_projectiles = GetNode<Node3D>("Projectiles");
 		Effects = GetNode<Effects>("Effects");
@@ -100,6 +105,44 @@ public partial class Level : Node3D
 	}
 
 	/// <summary>
+	/// Host only. An enemy calling out to the others (a growl everyone hears): any enemy that hears it
+	/// heads for `lead`, the spot the caller is telling them about, rather than for the caller.
+	/// </summary>
+	public void EmitCall(Vector3 position, float radius, SoundKind sound, Vector3 lead, Enemy caller)
+	{
+		if (!Multiplayer.IsServer())
+			return;
+
+		Effects.Rpc(nameof(Effects.PlaySound), (int)sound, position, radius);
+		foreach (Node child in _enemies.GetChildren())
+			if (child is Enemy enemy && enemy != caller)
+				enemy.HearCall(position, radius, lead);
+	}
+
+	/// <summary>
+	/// Host only. Where players keep getting away: the enemies (who all tell this level) check those
+	/// spots more and more. Spots within LostSpotMerge of each other count as one.
+	/// </summary>
+	public void RememberLostAt(Vector3 position)
+	{
+		for (int i = 0; i < _lostSpots.Count; i++)
+		{
+			if (_lostSpots[i].Position.DistanceTo(position) < LostSpotMerge)
+			{
+				_lostSpots[i] = (_lostSpots[i].Position, _lostSpots[i].Count + 1);
+				return;
+			}
+		}
+		_lostSpots.Add((position, 1));
+	}
+
+	/// <summary>Host only. The spots where players got away, and how many times.</summary>
+	public IReadOnlyList<(Vector3 Position, int Count)> LostSpots => _lostSpots;
+
+	/// <summary>How many times players have got away near this point (for the tests).</summary>
+	public int TimesLostNear(Vector3 position) => _lostSpots.Where(s => s.Position.DistanceTo(position) < LostSpotMerge).Sum(s => s.Count);
+
+	/// <summary>
 	/// Host only. A sound everyone hears: players through their speakers (muffled by their mask),
 	/// enemies through Hear(), at the same radius, so the AI never hears something you couldn't.
 	/// Silent AI-only noise (footsteps, for now) uses EmitNoise.
@@ -127,14 +170,25 @@ public partial class Level : Node3D
 
 	private void OnPeerDisconnected(long peerId) => _players.GetNodeOrNull(peerId.ToString())?.QueueFree();
 
+	// The host hands out spawn points (the first one nobody has), so no two players start on top of
+	// each other. Late joiners get one that's free.
 	private void AddPlayer(int peerId)
 	{
 		if (_players.HasNode(peerId.ToString()))
 			return;
 
+		var taken = _players.GetChildren().OfType<Player>().Select(p => p.SpawnSlot).ToHashSet();
+		int slot = Enumerable.Range(0, taken.Count + 1).First(s => !taken.Contains(s));
+		_playerSpawner.Spawn(new Godot.Collections.Array { peerId, slot });
+	}
+
+	private Node CreatePlayer(Variant data)
+	{
+		var args = data.AsGodotArray();
 		var player = PlayerScene.Instantiate<Player>();
-		player.Name = peerId.ToString();
-		_players.AddChild(player, forceReadableName: true);
+		player.Name = args[0].ToString();
+		player.SpawnSlot = args[1].AsInt32();
+		return player;
 	}
 
 	private void SpawnEnemy(Node3D point)

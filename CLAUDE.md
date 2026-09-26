@@ -26,13 +26,18 @@ update the matching doc in the same turn:
 The markdown docs are Claude's working notes. **`docs/overview.html` is the team's plain-English
 handbook** (no class names, file paths or code terms), published as an Artifact the team shares.
 When a change would alter something it says (a status tag, what's playable, controls, open
-questions, next steps), update it too, bump its date, and republish it.
+questions, next steps), update it too, bump its date, and republish it. Its **Working on now**
+section says what's in progress: update it whenever the current task starts, changes or finishes.
 
 ## Working in the code
 
 - Build: `dotnet build game/RND.sln`
 - Smoke tests (headless, from `game/`): see README. Run `--role=scenes`, and for networking
-  changes run `host` then `client`. Use Godot's `_console.exe` on Windows to see output.
+  changes `--role=network` (it starts its own clients; try `--clients=3 --ping=150 --jitter=20
+  --loss=2`, and `--clients=4 --ping=250 --jitter=40 --loss=5` for a stress run; client logs go
+  to `--out`). Use Godot's `_console.exe` on Windows to see output. Changes to
+  `core/SteamPeer.cs` or the Steam side of `Network.cs`: also run the network role with `--steam=1`
+  (Steam must be running; the whole test then goes through Steam's sockets on this computer).
   Always wrap runs in a timeout: if the test script fails to parse, Godot never quits.
 - Conventions: feature folders, one namespace per folder (`RND.Core`, `RND.Players`, ...), tabs,
   file-scoped namespaces, scripts next to their scenes.
@@ -47,6 +52,11 @@ questions, next steps), update it too, bump its date, and republish it.
   balance, run the `capture` role and read its bus meter log. Don't trust `AudioEffectRecord` on
   the dev machine: it's 7.1 surround, and the recorder misses non-positional sound.
 - Atmosphere-only sounds (ambience) go through `audio/Ambience.cs`, not `EmitSound`.
+- Player settings: a property on `core/Settings.cs` (load / save / `Apply`) plus a line in the
+  table in `ui/SettingsMenu.cs`. CI (`.github/workflows/build.yml`) runs both smoke tests and
+  exports the Windows build on every push; keep `export_presets.cfg`'s preset named "Windows".
+- Generated chambers (`maze/ChamberGenerator.cs`): after changing the generator (or a piece it uses),
+  run the smoke test's `generator` role (`--seeds=30`): every chamber must still solve from its plan.
 - Materials: author ordinary `StandardMaterial3D`s. `vfx/ToonStyle.cs` turns opaque ones into the
   cel-shaded look at runtime (F2 toggles it; the F2–F7 debug switches (look, plus F7 sound) are one table in `ui/Hud.cs`),
   and animating the original's albedo or emission still works. Liquids: a closed `Liquid` mesh + `vfx/Liquid.cs` + `vfx/liquid.gdshader`. A model used

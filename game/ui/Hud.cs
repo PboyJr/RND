@@ -62,6 +62,18 @@ public partial class Hud : Control
 
 		GetNode<Button>("%Resume").Pressed += () => SetPaused(false);
 		GetNode<Button>("%Leave").Pressed += () => Network.Instance.Leave();
+		GetNode<Button>("%Invite").Pressed += () => Network.Instance.InviteFriends();
+		// The settings panel takes the pause menu's place, and gives it back when it closes.
+		GetNode<Button>("%Settings").Pressed += () =>
+		{
+			_pauseMenu.Hide();
+			SettingsMenu.Instance?.Open();
+		};
+		Callable.From(() =>
+		{
+			if (SettingsMenu.Instance != null)
+				SettingsMenu.Instance.Closed += () => _pauseMenu.Visible = Visible && Input.MouseMode == Input.MouseModeEnum.Visible;
+		}).CallDeferred();
 	}
 
 	public void Open()
@@ -108,7 +120,10 @@ public partial class Hud : Control
 		_deathLabel.Visible = local.IsDead || run is { Active: true, Result: not RunResult.None };
 		if (run is { Active: true, Result: not RunResult.None })
 			_deathLabel.Text = (run.Result == RunResult.Passed ? "RUN COMPLETE" : "ALL SUBJECTS DOWN")
-				+ $"\nTests passed: {run.Chamber + (run.Result == RunResult.Passed ? 1 : 0)} of {run.Length}\nNext run starting…";
+				+ $"\nTests passed: {run.Chamber + (run.Result == RunResult.Passed ? 1 : 0)} of {run.Length}"
+				+ $"\n+{run.LastPay.Money} money   +{run.LastPay.Xp} XP"
+				+ (run.LastPay.Levels > 0 ? $"   LEVEL {ProfileStore.Instance?.Level}!" : "")
+				+ "\nNext run starting…";
 		else if (local.IsDead && Level.Current is { TimedRespawn: false })
 			_deathLabel.Text = "You're down.\nA teammate can revive you (hold E).";
 		else if (local.IsDead)
@@ -138,6 +153,7 @@ public partial class Hud : Control
 	private void SetPaused(bool paused)
 	{
 		_pauseMenu.Visible = paused;
+		GetNode<Control>("%Invite").Visible = Network.Instance.CanInvite;
 		Input.MouseMode = paused ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
 	}
 }

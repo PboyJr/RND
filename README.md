@@ -60,6 +60,13 @@ work.
 To open scripts from Godot in VS: **Editor → Editor Settings → Dotnet → Editor → External Editor**
 → Visual Studio.
 
+## Getting a build
+
+Every push builds the game on GitHub (Actions → "Build and test"): it runs the smoke tests and
+uploads a Windows build as the run's **RND-windows** artifact. Download it, unzip, and run
+`RND.exe` (keep the folder next to it). To export yourself: Godot → **Project → Export** →
+**Windows** (needs the 4.7 .NET export templates: **Editor → Manage Export Templates**).
+
 ## Testing multiplayer on one PC
 
 **Debug → Customize Run Instances…** → tick **Enable Multiple Instances**, set it to 2, then Play.
@@ -69,6 +76,13 @@ On a LAN, other machines join with the host's local IP. Windows Firewall will as
 you host; allow it on private networks.
 
 Running a level scene directly (F6) also works: you play offline as the host.
+
+## Playing with friends over Steam
+
+Have Steam running before you start the game. Click **Host on Steam**, then friends pick **Join
+game** on you in their Steam friends list (or use **Esc → Invite Steam friends**, which needs the
+Steam overlay). Nobody needs an IP address or port forwarding. For now the game shows up in Steam
+as "Spacewar" (Valve's free test app id); that changes once we have our own.
 
 ## Controls
 
@@ -84,7 +98,7 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | E on (or holding) a spare filter | Screw it onto your mask |
 | F2 – F6 | Debug view switches, to compare looks: cel shading, outlines, film grain, colour crush, lens (glass curve, edge blur, fringe). Pressing one lists what's on, top right |
 | F7 | Mute / unmute all sound (debug) |
-| Esc | Free the mouse, leave session |
+| Esc | Pause menu: settings (sensitivity, field of view, volume, fullscreen, v-sync, 3D resolution), invite Steam friends, leave session |
 
 You see everything through a gas mask. **The cracks in the glass are your health** (each hit
 cracks the side it came from); there's no health number, except a plain debug bar in the corner. Your **filter** runs down (faster when you
@@ -117,16 +131,20 @@ docs/        Design, decisions, roadmap
 
 ## How the networking works
 
-- **Listen server.** The host is also the server. Only the host loads levels; `LevelSpawner`
-  replicates them to clients, including late joiners.
+- **Listen server, star network.** The host is also the server, and clients only ever talk to the
+  host (never to each other). Only the host loads levels; `LevelSpawner` replicates them to
+  clients, including late joiners.
 - **Players are client-authoritative.** Each client moves its own player, so movement feels
-  instant. The player node is named after its owner's peer id, which is how authority gets
-  assigned. Everyone else smooths toward the replicated position and look direction.
+  instant, and reports where it is to the host 30 times a second; the host passes that on to
+  everyone else, who smooth toward it. The player node is named after its owner's peer id, which
+  is how authority gets assigned.
 - **Props are host-authoritative.** Only the host simulates physics. Clients hold frozen copies
   that follow the host's transform. Grab / release / throw are requests sent to the host, which
-  decides who holds what, so props never desync.
-- **Transport lives in `core/Network.cs`.** Swapping ENet for Steam (or a relay) happens there,
-  without touching gameplay code.
+  decides who holds what. The one exception is the prop you're carrying: your game simulates its
+  own copy (so it has no lag), and the host carries on from where your copy was when you let go.
+- **Level changes wait for clients** to stop reporting, so nothing arrives for a level that's gone.
+- **Transport lives in `core/`.** ENet by IP address, or Steam (`SteamPeer`: Valve's relay, friends-only
+  lobbies). `Network.cs` picks one; gameplay code can't tell which.
 
 ## Smoke test
 
@@ -134,10 +152,22 @@ docs/        Design, decisions, roadmap
 `_console.exe` Godot build on Windows so the output shows up:
 
 ```
-godot --headless res://tests/smoke_test.tscn -- --role=scenes   # scenes load; level + combat work offline
-godot --headless res://tests/smoke_test.tscn -- --role=host     # start this first...
-godot --headless res://tests/smoke_test.tscn -- --role=client   # ...then: join, carry, throw, fight, leave
+godot --headless res://tests/smoke_test.tscn -- --role=scenes    # scenes load; level, combat, chambers, a run offline
+godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --ping=150 --jitter=20 --loss=2
+godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --steam=1   # the same over Steam's sockets (Steam running)
 ```
+
+The network role hosts and starts its own clients (up to 4; the last one joins mid-run), each
+behind a fake internet connection (`--ping` round trip in ms, `--jitter` ms, `--loss` %; leave them
+out for a perfect connection). They play the sandbox and then a whole maze run: carrying crates,
+buttons, the closet, a revive, the ledge throw, someone leaving while carrying, and a failed run.
+It logs what players would feel (how far carried props trail, grab delay, traffic). Client logs go
+to `--out=<folder>`. To run a host and a client by hand instead: `--role=host`, then `--role=client`
+in a second terminal.
+
+Generated chambers have a sweep of their own: `--role=generator --seeds=30` builds 30 seeds at
+easy, medium and hard (90 chambers) and solves each one from its plan (`--seed=` and `--difficulty=`
+for a single one).
 
 Each prints `SMOKE PASS` or `SMOKE FAIL: ...` and exits 0 / 1.
 

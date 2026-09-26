@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 using RND.Audio;
 using RND.Core;
@@ -10,12 +11,24 @@ namespace RND.Props;
 /// Anything players can grab, carry and throw: crates, specimens, loot.
 /// The host runs the real physics. Clients get a frozen copy that follows the host's replicated
 /// transform, so everyone sees the same thing and nobody can desync a prop.
+/// The exception is the one you're carrying: your game simulates its own copy, so it hangs where
+/// you hold it with no network lag, and when you let go (or throw) the host carries on from where
+/// your copy was. Once it has come to rest where the host has it too, it's a frozen copy again.
 /// </summary>
 public partial class PhysicsProp : RigidBody3D
 {
 	private const float SmoothRate = 20f;
 	private const float SnapDistance = 3f;
 	private const float MaxGrabDistance = 4f;
+	// The host takes the holder's word for where the prop was on release only if it's roughly where
+	// the host has it too (they differ by the network lag); anything further off is ignored.
+	private const float AdoptDistance = 2f;
+	private const float RestSpeed = 0.05f;
+	private const float AgreeDistance = 0.25f;
+	private const double MaxPredictSeconds = 4.0; // after letting go, hand back to the host by then at the latest
+
+	// Host: who holds what, so nobody carries two things at once.
+	private static readonly Dictionary<int, PhysicsProp> HeldByPeer = new();
 
 	[Export] public string DisplayName { get; set; } = "Object";
 
@@ -49,9 +62,17 @@ public partial class PhysicsProp : RigidBody3D
 		set => SetHeldBy(value);
 	}
 
+	/// <summary>True while this client is simulating its own copy (carrying it, or just let go).</summary>
+	public bool Predicting { get; private set; }
+
 	private int _heldBy;
 	private float _lastSpeed;
 	private float _noiseCooldown;
+	private double _letGoAt;
+	private bool _letGoLocally; // client: we've let go, the host hasn't confirmed yet
+
+	private static double Now => Time.GetTicksMsec() / 1000.0;
+	private bool HeldByMe => _heldBy != 0 && _heldBy == Multiplayer.GetUniqueId();
 
 	public override void _Ready()
 	{
@@ -65,11 +86,19 @@ public partial class PhysicsProp : RigidBody3D
 		}
 	}
 
+	public override void _ExitTree()
+	{
+		if (_heldBy != 0 && HeldByPeer.TryGetValue(_heldBy, out PhysicsProp held) && held == this)
+			HeldByPeer.Remove(_heldBy);
+	}
+
 	public override void _PhysicsProcess(double delta)
 	{
 		if (!Multiplayer.IsServer())
 		{
-			FollowSyncedTransform((float)delta);
+			UpdatePrediction();
+			if (!Predicting)
+				FollowSyncedTransform((float)delta);
 			return;
 		}
 
@@ -79,6 +108,29 @@ public partial class PhysicsProp : RigidBody3D
 		MakeImpactNoise((float)delta);
 		SyncPosition = GlobalPosition;
 		SyncRotation = GlobalBasis.GetRotationQuaternion();
+	}
+
+	// Client: simulate our own copy while we hold it, and after letting go until it has come to rest
+	// where the host has it too. Then go back to following the host.
+	private void UpdatePrediction()
+	{
+		if (HeldByMe && !_letGoLocally)
+		{
+			if (!Predicting)
+			{
+				Predicting = true;
+				Freeze = false;
+				Sleeping = false;
+			}
+			return;
+		}
+
+		if (Predicting && ((HeldBy != 0 && !HeldByMe) || Now - _letGoAt > MaxPredictSeconds
+			|| (LinearVelocity.Length() < RestSpeed && GlobalPosition.DistanceTo(SyncPosition) < AgreeDistance)))
+		{
+			Predicting = false;
+			Freeze = true;
+		}
 	}
 
 	// A sudden loss of speed means it hit something. Speeding up (being thrown) is silent, and so is
@@ -97,9 +149,10 @@ public partial class PhysicsProp : RigidBody3D
 		Level.Current?.EmitSound(GlobalPosition, Mathf.Clamp(lost * 2f * Mathf.Sqrt(Mass / 4f), 3f, 18f), SoundKind.Impact);
 	}
 
+	// Pulls a held prop toward its holder's hold point: on the host, and on the holder's own game.
 	public override void _IntegrateForces(PhysicsDirectBodyState3D state)
 	{
-		if (HeldBy == 0 || !Multiplayer.IsServer() || !Player.TryGet(HeldBy, out Player holder))
+		if (HeldBy == 0 || !(Multiplayer.IsServer() || (HeldByMe && !_letGoLocally)) || !Player.TryGet(HeldBy, out Player holder))
 			return;
 
 		Vector3 toTarget = holder.HoldPoint - state.Transform.Origin;
@@ -109,6 +162,27 @@ public partial class PhysicsProp : RigidBody3D
 		state.AngularVelocity = state.AngularVelocity.Lerp(Vector3.Zero, 0.2f);
 	}
 
+	/// <summary>The holder lets go: it drops with whatever momentum it has.</summary>
+	public void Release() => LetGo(Vector3.Zero);
+
+	/// <summary>The holder throws it along `direction`.</summary>
+	public void Throw(Vector3 direction) => LetGo(direction.Normalized());
+
+	// Our copy stops being pulled at once (the host only confirms a round trip later) and, for a
+	// throw, flies off at once; the host is sent its state to carry on from.
+	private void LetGo(Vector3 throwDirection)
+	{
+		if (Predicting)
+		{
+			_letGoLocally = true;
+			LinearVelocity += throwDirection * ThrowStrength / Mass;
+		}
+		_letGoAt = Now;
+		RpcId(1, MethodName.RequestLetGo, Predicting, GlobalPosition, GlobalBasis.GetRotationQuaternion(), LinearVelocity, AngularVelocity, throwDirection);
+	}
+
+	private float ThrowStrength => Mathf.Min(ThrowImpulse, MaxThrowSpeed * Mass);
+
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	public void RequestGrab()
 	{
@@ -116,25 +190,38 @@ public partial class PhysicsProp : RigidBody3D
 			return;
 
 		int sender = Multiplayer.SenderId();
-		if (Player.TryGet(sender, out Player player) && player.EyePosition.DistanceTo(GlobalPosition) < MaxGrabDistance)
+		if (HeldByPeer.ContainsKey(sender))
+			return; // one thing at a time
+		if (Player.TryGet(sender, out Player player) && !player.IsDead && player.EyePosition.DistanceTo(GlobalPosition) < MaxGrabDistance)
 			HeldBy = sender;
 	}
 
+	/// <summary>
+	/// Holder → host: let go (a throw if `throwDirection` isn't zero). A client that was simulating
+	/// its own copy sends that copy's state (already thrown, for a throw); the host takes it over if
+	/// it's close to where the host has the prop, so the prop goes where the holder saw it go.
+	/// </summary>
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	public void RequestRelease()
+	public void RequestLetGo(bool predicted, Vector3 position, Quaternion rotation, Vector3 velocity, Vector3 angularVelocity, Vector3 throwDirection)
 	{
-		if (Multiplayer.IsServer() && HeldBy == Multiplayer.SenderId())
-			HeldBy = 0;
-	}
-
-	[Rpc(MultiplayerApi.RpcMode.AnyPeer, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	public void RequestThrow()
-	{
-		if (!Multiplayer.IsServer() || HeldBy != Multiplayer.SenderId() || !Player.TryGet(HeldBy, out Player player))
+		int sender = Multiplayer.SenderId();
+		if (!Multiplayer.IsServer() || HeldBy != sender || !Player.TryGet(sender, out Player _))
 			return;
 
 		HeldBy = 0;
-		ApplyCentralImpulse(player.AimDirection * Mathf.Min(ThrowImpulse, MaxThrowSpeed * Mass));
+		bool thrown = throwDirection.LengthSquared() > 0.5f;
+		if (predicted && position.DistanceTo(GlobalPosition) < AdoptDistance && rotation.LengthSquared() > 0.5f)
+		{
+			GlobalTransform = new Transform3D(new Basis(rotation.Normalized()), position);
+			// Its velocity already includes the throw; cap it like a throw would be.
+			LinearVelocity = velocity.LimitLength(MaxFollowSpeed + MaxThrowSpeed);
+			AngularVelocity = angularVelocity;
+			_lastSpeed = LinearVelocity.Length(); // not a crash
+		}
+		else if (thrown)
+		{
+			ApplyCentralImpulse(throwDirection.Normalized() * ThrowStrength);
+		}
 	}
 
 	private void SetHeldBy(int peerId)
@@ -142,12 +229,23 @@ public partial class PhysicsProp : RigidBody3D
 		if (peerId == _heldBy)
 			return;
 
+		if (_heldBy != 0 && HeldByPeer.TryGetValue(_heldBy, out PhysicsProp held) && held == this)
+			HeldByPeer.Remove(_heldBy);
+		if (HeldByMe)
+			_letGoAt = Now; // the host dropped it for us (snagged), or we let go
+
 		IgnoreCollisionsWith(_heldBy, false);
 		_heldBy = peerId;
+		_letGoLocally = false;
 		IgnoreCollisionsWith(_heldBy, true);
 
+		// A held prop resting at the hold point mustn't fall asleep: a sleeping body stops being pulled.
+		CanSleep = _heldBy == 0;
 		if (_heldBy != 0)
+		{
+			HeldByPeer[_heldBy] = this;
 			Sleeping = false;
+		}
 	}
 
 	// The holder shouldn't be able to stand on (or get shoved by) what they're carrying.

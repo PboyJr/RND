@@ -58,7 +58,8 @@ about carrying physics objects.
 **Decision:**
 - **Players are client-authoritative.** Each client moves its own player, so movement feels
   instant, and the synchronizer replicates it. Remote players smooth toward the replicated state and
-  snap if more than 3 m off.
+  snap if more than 3 m off. (Updated 2026-09-25: the client now reports its state to the host,
+  which replicates it; see "Player state goes through the host".)
   - The player node is **named after its owner's peer id**. Authority is set from the name in
     `_EnterTree`.
 - **Props are host-authoritative.** Only the host simulates physics. Clients hold **frozen
@@ -95,6 +96,7 @@ the level spawned by the host avoids that race.
   addon over our own connection.
 - **Our own backend:** probably needed eventually, for (a) persistent characters that can't be
   edited locally (the decay system) and (b) relaying phone players, who can't use Steam.
+- (2026-09-25: Steam now has a plan, see "Steam plan" below.)
 
 ## 2026-09-24: Look: grain post-process layer (*Superseded* by "Gas mask visor" below)
 
@@ -115,7 +117,8 @@ the level spawned by the host avoids that race.
 
 **Decision:** `game/tests/smoke_test.tscn` runs headless in three roles: `scenes` (every scene
 loads and the level plays offline), `host` and `client` (real ENet session: join, grab, throw,
-leave). Commands are in the README.
+leave). Commands are in the README. (2026-09-25: `network` now runs the host and its clients in
+one command, over a fake bad connection; see "The network test plays a whole maze run".)
 
 **Why:** we can't click through the game on every change, and networking bugs hide until a second
 player shows up.
@@ -605,25 +608,355 @@ release. Checking the path is the general fix: it also covers rooms behind shut 
 **How we verified it:** the smoke test watches the released evil guy for 6 s and fails if he
 ever heads for a spot he can't reach. Against the old code it fails with a spot on the roof.
 
+## 2026-09-25: Chambers are listed easiest first, and a run climbs the list
+
+**Decision:** `MazeRun.Chambers` (on `Main`) is in difficulty order, with no separate difficulty
+tag. Chamber *k* of a run sits at position `k × (chambers − 1) / (length − 1)` along the list. When
+that falls between two chambers it picks one at random, weighted to the nearer. So a 3-chamber run
+over 3 chambers is always easiest → hardest, and adding chambers makes runs vary without code
+changes. New chambers go in `maze/` as ordinary levels, and in `Main`'s `LevelSpawner` list.
+
+**Why:** a list order is the smallest thing that gives a ramp. A per-chamber difficulty number
+only earns its place once chambers are assembled from modules, or picked from a big pool.
+
+**How we verified it:** the smoke test runs every chamber in the list (spawn, the evil guy can
+reach the start, the exit is shut). It solves the new two with props, including a jar thrown at a
+real throw's speed from the exit door onto the ledge button. It checks that a 2-chamber run is the
+easiest chamber, then the hardest.
+
+## 2026-09-25: The network test plays a whole maze run, over a fake bad connection
+
+**Decision:** `--role=network` (in `tests/smoke_test.gd`, the suite is `tests/net_suite.gd`) hosts
+and starts its own clients (up to 4; with 2 or more, the last joins mid-run). They play the sandbox
+and then a whole maze run the way players would: they walk (colliding with doors), carry crates onto
+the plate one at a time, hold a button door open, fetch the case from the closet, go down and get
+revived, lob a jar onto the ledge button, and at the end one leaves while carrying a crate and the
+rest go down to fail the run. They meet at barriers on the host, ask it for host-only things, and
+send it their results, so the host's exit code covers everyone. `--ping` (round trip, ms),
+`--jitter` and `--loss` (%) put each client behind `tests/lag_proxy.gd`, a UDP relay on a thread
+that holds packets back and drops some. It also measures what a player would feel: how far a
+carried prop trails the hold point, how long a grab takes, the late joiner's clock, and traffic.
+The old `host` / `client` roles still work by hand (one client, no late join).
+
+**Why:** every network test ran on one machine with no delay, and the maze run had never been
+played over the network at all. This found nine real bugs in its first day (the entries below).
+
+**Passing configurations:** 1 client with no lag; 3 clients at 150 ms / 20 ms jitter / 2% loss; 4
+clients at 250 ms / 40 ms jitter / 5% loss.
+
+**Gotcha:** test processes cap themselves at 120 fps (`Engine.max_fps` in `smoke_test.gd`).
+Headless Godot runs uncapped, so a host and four clients on one machine each spun a core flat out
+and starved each other: a client could go a second without a frame, so the host didn't know where
+it was and refused its first grab. That looked exactly like a network bug. Players have v-sync.
+
+## 2026-09-25: Player state goes through the host; clients never talk to each other
+
+**Decision:**
+- Each client sends its own player's state (position, look, hold distance, slot, flask charge) to
+  the host 30 times a second (`Player.ReportState`, unreliable-ordered). The host copies it into
+  the player's `Sync*` properties, and the player's synchronizer (now **host-owned**, rooted on
+  itself, 30 Hz) sends it on to everyone else. A visibility filter keeps it from going back to the
+  owner, so nothing the owner controls (slot, hold distance) is overwritten by an older copy.
+- The synchronizer is rooted on its own node, not the player: a spawned node's synchronizer
+  visibility also decides whether that node is spawned for a peer, and hiding the player from its
+  owner would stop the owner getting its own player.
+- **Server relay is off** (`SceneMultiplayer.ServerRelay = false`, set in `Network`): a star
+  network. Clients only hear from the host, and don't learn about each other.
+
+**Why:** with client-owned synchronizers, every client sent its state to everyone (relayed by the
+host). State in flight for a player that had just been removed (level changes) or not yet created
+(late joiners) gave dozens of engine errors per transition at 150 ms. With the relay on, two
+clients leaving in the same frame made the host tell one about the other after ENet had already
+dropped it (another engine error). Same latency as before, since relayed traffic went through the
+host anyway.
+
+## 2026-09-25: Level changes wait for clients to stop reporting
+
+**Decision:** `Main.ChangeLevel` (host) first sends `LevelEnding`; each client stops reporting its
+player and confirms; the host swaps once everyone has (or after 1 s). The request, the reports and
+the confirmation all use `Network.StateChannel` (transfer channel 1): on one channel, reliable and
+unreliable messages stay in order with each other, so no report sent before the confirmation can
+arrive after it. (On channel 0 they take separate routes.) `Main.ChangingLevel` is true meanwhile;
+`MazeRun` waits for it.
+
+**Why:** a report still on its way when the host freed the level arrived for a player that no
+longer existed. And while the swap waits, the old chamber (already passed) is still loaded: the run
+counted it as passed again and skipped the next chamber. The network test caught both.
+
+## 2026-09-25: The prop you carry is simulated on your own machine
+
+**Decision:** a client carrying a prop unfreezes its own copy and runs the same carry spring on it,
+toward its own (lag-free) hold point, so the prop hangs where you hold it. When you let go or throw,
+your copy stops being pulled at once (and, for a throw, flies off at once), and the host is sent
+your copy's position and velocity (`PhysicsProp.RequestLetGo`). The host takes them over if they're
+within 2 m of where it has the prop, so the prop goes where you saw it go. Your copy keeps
+simulating until it has come to rest where the host has it too (or 4 s), then goes back to being
+a frozen copy of the host's. Everyone else still sees the host's copy.
+Also: the host pulls a client's prop toward that client's latest *reported* hold point, not the
+smoothed body it draws (which trails it), and a held prop can't fall asleep (a sleeping body stops
+being pulled).
+
+**Why:** the host simulated every prop, so a client's carried prop lagged a full round trip plus
+two lots of smoothing: it trailed the hold point by about 1 m on a perfect connection and 2–2.9 m
+at 150 ms, and the host drops a prop that falls 3 m behind. Now it trails by the carry spring alone:
+0.5 m on average while walking, at any ping, and drops land within a few centimetres of where the
+holder let go.
+
+**Trade-offs:** your copy collides with frozen copies of other props, which don't budge, so while
+carrying it can snag on something that moves on the host; the host takes over your version on
+release. Grabbing still waits a round trip (200 ms at 150 ms ping): the host has to agree you got it.
+
+## 2026-09-25: Leaving says goodbye, and silent peers are dropped after 6 s
+
+**Decision:** `Network.EndSession` disconnects gracefully (`PeerDisconnectLater`: acknowledged,
+after anything still queued) and keeps polling the old connection for up to 1 s while the rest of
+the game has already moved on (`Network.IsClosing`). Both sides set ENet's timeout to 2–6 s
+(default 30 s).
+
+**Why:** closing outright sends one unacknowledged packet; when it was lost, the host only noticed
+the player had gone when they timed out, 30 s later, and their frozen player kept holding whatever
+it carried.
+
+## 2026-09-25: Smaller network fixes the test found
+
+- **Spawn points are handed out by the host** (`Level.AddPlayer`, the first free slot, through the
+  player spawner's spawn function so every peer builds the player with its `SpawnSlot`). Clients
+  used to pick `peer id mod 6`: a 72% chance that two of four players start on top of each other.
+- **Reach checks use the latest report** (`Player.EyePosition` for someone else's player): throws,
+  grabs, buttons, filters and revives. At high ping the host refused actions the player really was
+  close enough for.
+- **One held prop per player is enforced by the host** (`RequestGrab`), not just the client.
+- **The chamber clock and "test complete" are replicated** from the host (a synchronizer on
+  `Exit`, 10 Hz), so late joiners see the right time and result. Each peer used to start its own
+  clock when it loaded the chamber.
+
+## 2026-09-25: Players pass through each other; downed players lie down
+
+**Decision:** players don't collide with other players (`collision_mask` 13: world, props,
+entities). They still count for plates, the exit, doors and enemies. A downed player's collision
+shape lies down with the body (it was an invisible 1.8 m pillar), so it still weighs down a plate.
+
+**Why:** at internet ping, everyone bumps into where the others were a moment ago, and in the
+network test the physics pushing two overlapping players apart shoved one through the floor. Being
+able to block or stand on teammates can come back later as a deliberate mechanic.
+
+## 2026-09-25: Settings are an autoload; the panel is one table
+
+**Decision:** `core/Settings.cs` (autoload `Settings`) holds mouse sensitivity (a multiplier on
+`Player.MouseSensitivity`), field of view, master / world / in-mask volume, fullscreen, v-sync and
+3D resolution scale. It loads `user://settings.cfg` (a `ConfigFile`) at startup and applies what the
+engine needs (bus volumes, window mode, v-sync, `Viewport.Scaling3DScale`); the player reads
+sensitivity live and field of view whenever it changes. `ui/settings_menu.tscn` (one instance on
+`Main/UI`, `SettingsMenu.Instance`) builds its rows from a table in `SettingsMenu.cs`, applies every
+change at once and saves when it closes. It opens from the main menu and the pause menu (taking the
+pause menu's place until it closes). The F2–F7 debug switches stay separate and unsaved.
+
+**Why:** mouse sensitivity was a hard-coded export, and there was no volume, window or graphics
+option at all: the first things a playtester asks for. The 3D resolution scale is the cheap lever
+for weak GPUs (the visor, outlines and cel shading have never been tried on one).
+
+**How we verified it:** the offline smoke test saves, reloads and applies settings (the world
+volume must reach the World bus) and loads the panel; the capture role screenshots it over the game.
+
+## 2026-09-25: Windows export preset and CI on every push
+
+**Decision:**
+- `game/export_presets.cfg` has one preset, **Windows** (x86_64, `.pck` embedded, tests excluded),
+  exporting to `builds/windows/RND.exe` (gitignored). With .NET, the exe sits next to a
+  `data_RND_windows_x86_64` folder; ship the whole folder.
+- `.github/workflows/build.yml` runs on every push and pull request (Ubuntu): downloads Godot 4.7
+  .NET and its export templates (cached), builds the C# project, imports assets, runs the offline
+  smoke test and the network test (2 clients at 150 ms / 2% loss), then exports the Windows build
+  and uploads it as the run's `RND-windows` artifact. Client logs are kept if the network test fails.
+
+**Why:** nobody outside this machine could run the game, and nothing checked that a push didn't
+break it.
+
+**Not yet verified:** the workflow has never run (it runs once the branch is pushed), and no build
+has been exported locally, because the export templates (about 1 GB) aren't installed on the dev
+machine. The preset itself loads: a local export stops only at the missing templates.
+
+## 2026-09-25: Runs pay into the local profile; the host clamps levels for difficulty
+
+**Decision (the storage design from "Player data is a local profile", now built):**
+- `players/Profile.cs` is the data (`Profile`: version, run count, money, active character, the
+  roster; `Character`: id, name, archetype, level, XP, rebirths, upgrades, abilities, `LastRun`),
+  plus its rules: `StartRun` (count the run; the active character's `LastRun` moves forward by
+  `RetrainRuns` = 3, capped), `Grant` (money and XP, levelling up at `100 × level` XP per level) and
+  `Sanitise` (clamps anything a hand-edited file got wrong).
+- `players/ProfileStore.cs` (autoload) loads `user://profile.json` the first time it's asked, or
+  the path given with `--profile=<path>` (a second copy of the game on the same PC, and the tests,
+  use their own). Saves go to a `.tmp` file and are then moved into place, so a crash mid-save can't
+  corrupt it; a file that won't parse is kept as `.bad` and a fresh profile started.
+- `MazeRun` numbers each run of the session (`runId`, sent with its state). Each peer's profile
+  counts a run the first time it sees that run active, late joiners included, so quitting can't
+  dodge the count. At the end, the host sends the pay (`Pay` RPC, every peer, once per run):
+  **100 money and 50 XP per chamber passed** (failed runs too), **plus 200 money and 100 XP for
+  passing the run**. Numbers are exports on `Main/Run`, to tune.
+- Each client reports its level to the host on joining; the host clamps it (1–50) and uses
+  **0.7 × average + 0.3 × highest** (DESIGN) to pick where in the chamber list the run starts: level
+  1 at the easiest, level 20+ halfway up. Runs still end at the hardest.
+- The result screen shows the pay (and a level-up); the main menu shows level, XP, money and runs.
+
+**Why:** the maze run had an end but paid nothing, so there was nothing to come back for.
+
+**How we verified it:** the offline smoke test (on its own profile) passes a run and fails one,
+then checks the run count, `LastRun`, money, level and XP, that it's on disk, and that an unreadable
+file is set aside. The network test checks every client (the late joiner too) was paid for the run
+and counted it once, and that the failed run afterwards paid nothing.
+
+**Not yet:** nothing to spend money on (the between-run hub / research tree is its own job), no
+abilities (so no decay effects yet, though `LastRun` is tracked), one character per profile (the
+roster exists in the file, there's no UI to make or pick another).
+
+## 2026-09-25: Enemy AI v3: calls, waiting at doors, habits
+
+**Decision:** still only what it perceives, but it uses more of it.
+- **Calls.** When an evil guy spots someone, and again when it loses them, it growls a *call*
+  (`Level.EmitCall`): players hear the growl like any sound, and every other evil guy that can hear
+  it (walls muffle, as for noise) goes to the call's *lead*, where the player is (or, when lost,
+  where they were heading), not to the caller. The pack converges on you, and a lost chase becomes a
+  flank. It's fair: you hear the same growl.
+- **Waiting at doors.** `Investigate` checks whether its path reaches the spot. If not (behind a
+  shut door, since doors are walls to the navmesh), it goes as close as it can and waits there
+  (`State.Ambush`, `AmbushSeconds` = 20 s), facing the spot and re-checking every 0.5 s; when the door
+  opens it goes in. If there's another way round, that's simply the path it takes.
+- **Habits.** Where it loses sight of someone is remembered per level (`Level.RememberLostAt`,
+  spots within 2.5 m merge). A spot where players have got away twice or more is where it patrols
+  when calm, and the first place it checks when searching nearby (each spot at most every
+  `HabitCooldown` = 20 s). The more you hide somewhere, the more it looks there.
+- `Enemy.Hear` and `HearCall` share one hearing check (`HearingReach`).
+
+**Why:** the next step from the design's AI v3 list, and three known limitations: it stood at shut
+doors doing nothing, it had no way to share what it saw beyond a growl that pointed at itself, and
+it never learnt. Noise itself stays sourceless on purpose: a thrown crate should lure it away (the
+design's distraction play), which a noise that told it who threw it would spoil.
+
+**How we verified it:** offline smoke checks: a second evil guy that hears the first one's growl
+(but can't see you) heads for you, not the growler; losing you is remembered; a spot where players
+got away twice is the first place it patrols; in the closet chamber it waits by the shut door for 7 s
+after hearing a noise inside, and comes in when the door opens.
+
+## 2026-09-25: Generated chambers, built from a seed on every peer
+
+**Decision:**
+- `maze/ChamberGenerator.cs` builds a chamber from a seed and a difficulty (0–1) into
+  `maze/generated_chamber.tscn`, an empty chamber (spawners, exit, effects, no room). A room is
+  12–16 m square with a start and an exit corridor; the puzzle is bought from a difficulty budget
+  (1 + 3 × difficulty points): a plate always (weighed down by 4 crates or the case), then a closet
+  holding the case behind a button door (1.5), a ledge button only a thrown jar can press (1.5), a
+  second plate (1), a heavier plate needing case + crate (0.5), and above 0.75 a second evil guy
+  (1). The evil guy's release comes sooner the harder it is (28 s → 12 s). Pieces go on a 1 m grid
+  that keeps the walk from start to exit, both doorways and the closet's mouth clear.
+- The room is built from **plain boxes** (static bodies with box meshes), not CSG: the navmesh
+  bake reads them at once, whereas CSG made in code only builds its geometry later.
+- The generator leaves a **plan** on the level (meta `plan`: seed, difficulty, size, pieces, each
+  plate and the props that weigh it down, the closet's button and what it holds, the ledge button
+  and a spot to throw from). The smoke test solves chambers from it.
+- **Networking:** the host's `MazeRun` picks `GeneratedShare` of chambers (0.5) as generated, with a
+  fresh seed and the run's difficulty at that point; `Main.ChangeToGenerated` spawns
+  `[seed, difficulty]` through the level spawner, whose spawn function builds the room on every peer
+  (late joiners too). Same seed, same names and places, so everything replicates as in a
+  hand-built chamber.
+
+**Why:** a run was the same three rooms in the same order. The design's "chambers assembled from
+modules" is the scalable answer to content, and "intelligent and dynamic" applies to rooms too.
+Chambers stay separate levels (a lift between tests) rather than stitched into one.
+
+**How we verified it:** the offline smoke test builds seed 7 twice (the same room), then builds
+and solves one chamber at each of three difficulties. `--role=generator --seeds=N` sweeps more:
+each chamber must spawn you in the start corridor with the exit shut, let the evil guy reach you,
+keep every prop it needs reachable, and open when its plan is followed (closet button, props onto
+plates, a real-speed jar lob at the ledge button). 90 of 90 passed (30 seeds). The network test
+makes the run after the failed one generated and checks every client built the host's room.
+
+## 2026-09-25: Navigation maps update synchronously
+
+**Decision:** `navigation/world/map_use_async_iterations = false` and
+`navigation/world/region_use_async_iterations = false` in `project.godot`.
+
+**Why:** with Godot's asynchronous map updates, a navmesh change that arrives while the map is
+still rebuilding (a new level's bake finishing right after the level itself was added) can be
+dropped: the map then has **no polygons** for that level, and nothing can path. The generator sweep
+found it (every chamber after the first failed; alone, each passed; forcing a map update fixed it;
+the map setting alone still missed one in the longer offline suite, so regions update in step too).
+It can happen on any level change, so it's the likely cause of "the evil guy saw you but never left
+his spawn" (noted earlier as stale editor state). Our maps are small, so updating them in step
+costs nothing noticeable.
+
+## 2026-09-25: Steam plan (built 2026-09-26, see "Steam transport built" below)
+
+**Recommendation:** **Facepunch.Steamworks** (MIT, C#, one NuGet package that includes
+`steam_api64.dll`) over GodotSteam (a C++ engine extension; from C# it's reached through untyped
+calls or community bindings, and it's a per-platform binary to keep in step with the editor).
+The plan, all inside `core/` so gameplay code doesn't change:
+- `core/SteamPeer.cs`: a `MultiplayerPeerExtension` over Steam's networking sockets (Valve's relay,
+  so no port forwarding or NAT trouble). Peer ids come from Steam ids (a 31-bit hash; the host is
+  1). Godot's reliable / unreliable modes map to Steam's send flags.
+- `Network.cs`: `HostSteam()` creates a friends-only Steam lobby and opens a listen socket;
+  `JoinSteam(lobby)` connects to the lobby owner. Accepting an invite (Steam overlay) or joining
+  from the friends list calls it. The main menu gets "Host on Steam" / "Invite friends"; the IP
+  box stays for LAN.
+- Development uses Steam's test app id **480** (set in code; no `steam_appid.txt` needed, and not
+  shipped). A real app id needs the $100 Steam Direct fee.
+- One thing to change first: our level-change handshake relies on ENet keeping a channel's
+  reliable and unreliable messages in order. Steam doesn't promise that across the two, so the
+  player state reports should carry the level they belong to (the host drops stale ones).
+- **Testing needs two computers with two Steam accounts** (Steam allows one account per machine),
+  so the last step is a playtest by the team. The network smoke test keeps running on ENet.
+
+*(The team said yes on 2026-09-26.)*
+
+## 2026-09-26: Steam transport built (`Decided`, relay still to try with two accounts)
+
+Built as planned (Facepunch.Steamworks 2.3.3, Steam test app id 480), with two changes:
+- **Ordering lives in the Steam peer, not in gameplay.** Instead of tagging player reports with the
+  level they belong to, `core/SteamPeer.cs` copies ENet's rule: on a channel other than 0, an
+  unreliable-ordered message is dropped if a reliable message sent after it has already arrived
+  (each message carries the sender's reliable count for its channel). Gameplay code and the
+  level-change handshake stay transport-blind.
+- **The host hands out peer ids** (a welcome message, reliable, so it arrives first), like ENet,
+  instead of hashing Steam ids. That's also what lets several test clients share one Steam account.
+
+How it fits together:
+- `Network.StartSteam()` runs at startup (not in headless runs) if Steam is running; callbacks are
+  pumped in `Network._Process`, on the main thread. No Steam just means no Steam button.
+- **Host on Steam** (main menu) opens a relay listen socket and a friends-only lobby. Friends join
+  from their friends list ("Join game") or an invite (pause menu → Invite Steam friends, which
+  needs the Steam overlay); both arrive as a lobby join, and the game connects to the lobby's
+  owner. A game that isn't running is started with `+connect_lobby <id>`, which we read too.
+- The host only lets in its Steam friends and people in its lobby.
+- Steam's native library (`steam_api64.dll`) is copied next to our assemblies by the csproj, and a
+  resolver in `Network` loads it from there: Godot loads our assemblies from memory, so .NET
+  wouldn't look in that folder by itself.
+- **Testing on one computer:** `--steam=1` on the network smoke test makes Host / Join by address
+  use Steam's sockets over plain UDP instead of ENet (`Network.DirectOverSteam`), so the whole test
+  (lag proxy included) runs through `SteamPeer`. It passes with 1 client, 3 at 150 ms / 2% loss and
+  4 at 250 ms / 5% loss. Hosting through the relay with a lobby works on one computer; a friend
+  actually connecting through the relay needs a second Steam account, so that's the team's
+  playtest. CI keeps testing ENet (no Steam on the build machine).
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
 
 - Props sync position every tick even when asleep. Fine for a few dozen props; optimise later
   (sleep-aware sync, lower rate).
-- The "one held prop per player" rule is only enforced on the client.
-- Clients pick their own spawn point (peer id mod spawn count), so two players can pick the same one.
-- Name labels show peer ids. Real names come with Steam.
+- Name labels show peer ids. Steam names need the host to pass each player's name on (not done yet).
+- Steam: joining through the relay hasn't been tried with two accounts yet (see "Steam transport
+  built"). Invites need the Steam overlay, which may only work when the game is started from Steam.
 - Walking into props doesn't push them (clients see frozen copies). Grabbing is the only way to
   move them.
 - No crouch or stamina yet.
+- Settings have no key rebinding and no graphics presets beyond the 3D resolution scale.
 - Player movement is still client-authoritative. With combat, a hacked client could teleport or
   speed-hack away from the evil guy. Fine for co-op; revisit before PvP (player monsters).
 - Building the navmesh from CSG prints a Godot warning ("had to parse RenderingServer meshes at
   runtime"). It's harmless for grey-box levels and goes away once levels use real meshes with
   collision shapes (the navmesh already only reads colliders on the World layer).
 - The death "pose" is a placeholder (the capsule tips over), and respawn is a fixed 8 s timer.
-- Only one enemy type. It ignores thrown props, sound and light.
+- Only one enemy type, and it ignores light. Levels have one evil guy each; the pack behaviour (calls)
+  needs two or more, which no level has yet.
 - The enemy can drop down but never jump up. Drop links are one-way, and the only way up is a real
   ramp or stairs.
 - Drop links are generated once per bake. Anything that changes the level at runtime (a door, a
@@ -648,7 +981,8 @@ Things the prototype does on purpose that we'll need to revisit:
 - The projected HUD's layout assumes the visor shape (it avoids the nose cup at the bottom
   centre). If the visor shape changes, re-check `ui/visor_hud.tscn` anchors.
 - Noise carries no source, only a position and a radius. Hearing a crash sends it to the crash,
-  not to whoever threw the crate. Add a source back if AI ever needs to tell noises apart.
+  not to whoever threw the crate. That's on purpose (it makes distraction work); calls between evil
+  guys carry a lead instead.
 - The thrower's own flask appears after a network round trip (no client-side prediction).
 - Crack direction is a local guess (the nearest evil guy within 4 m), because `Health.Damaged`
   doesn't carry where a hit came from on clients. Send the hit position with the damage if
@@ -656,29 +990,25 @@ Things the prototype does on purpose that we'll need to revisit:
 - Cracks only clear when health is back to full (respawn). Partial healing, if it's ever added,
   should mend some cracks.
 - Rebuilding the C# code or reimporting assets from the command line while the Godot editor is
-  open can leave the editor running stale state (seen 2026-09-25: the evil guy saw you but never
-  left his spawn). Close Godot fully and reopen the project.
-- Maze chamber clocks start when each peer loads the chamber, and "test complete" is a one-off RPC,
-  so a late joiner's clock is off and they never see the test as passed. Sync the chamber state
-  once chambers chain into a maze.
-- Passing a chamber doesn't lead anywhere yet: there's one chamber and no next one.
+  open can leave the editor running stale state. (The "evil guy never left his spawn" seen on
+  2026-09-25 was most likely the async navigation map bug; see "Navigation maps update
+  synchronously".) Close Godot fully and reopen the project if things act strangely.
 - The evil guy walking through an open door is only checked as "a path exists", not by watching
   him walk it (drop links work the same way and he walks those).
-- Standing at a shut door is all he does about it: he doesn't wait for it to open, or look for
-  another way round, unless the search takes him there.
-- Plates, buttons and doors are only smoke-tested offline. `Pressed` replicates like any other
-  synced property, but the network roles still run on the test level, not the chamber.
 - Doors and buttons have no sounds of their own (both reuse `Impact`), no ticking while a button
   runs down, and doors have no visible frame or track.
 - Each peer runs its own door, so a jam can differ slightly between peers for a moment: the
   host's crate is in the doorway before the client's copy of it is. It settles once the crate stops.
 - The acid flask can't press a button (it's a projectile, not a `PhysicsProp`).
-- A maze run over the network (changing chambers mid-session) isn't smoke-tested: the network
-  roles still play the test level. Offline, a whole run (pass, restart, fail) is tested, and so is
-  a revive over the network.
 - The hold-[E] revive (aiming, progress) isn't tested; the test sends `RequestRevive` directly.
-- The run picks chambers at random from a pool of one, and restarts on its own after the result
-  screen (no lobby, no reward yet).
+  The network test walks and carries by moving the player directly (headless has no mouse capture,
+  so the real input path isn't driven).
+- The run restarts on its own after the result screen (no lobby, no reward yet).
+- Traffic, measured by the network test: each client downloads about 16 KB/s (130 kbit/s) and
+  uploads about 2 KB/s, so the host uploads about 16 KB/s per client (a 6-player host: ~80 KB/s).
+  Most of it is props, synced 30 times a second even when asleep.
+- The network test plays at most 4 clients: two lanes, two rows through the 3 m corridors. 6-player
+  sessions (5 clients) aren't tested.
 - Telling mental from physical drops on clients relies on the health synchronizer sending `Mental`
   and `Current` in the same update, `Mental` first. If a drop ever mixes both in one update, only
   the physical part counts as a hit, which is right; if they ever arrive in separate updates, a

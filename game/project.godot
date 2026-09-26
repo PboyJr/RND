@@ -19,6 +19,8 @@ config/icon="res://icon.svg"
 [autoload]
 
 Network="*res://core/Network.cs"
+Settings="*res://core/Settings.cs"
+ProfileStore="*res://players/ProfileStore.cs"
 
 [display]
 
@@ -127,6 +129,8 @@ hotbar_5={
 [navigation]
 
 3d/default_cell_height=0.05
+world/map_use_async_iterations=false
+world/region_use_async_iterations=false
 
 [physics]
 

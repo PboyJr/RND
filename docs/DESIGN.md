@@ -201,8 +201,25 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
 - **Layout: REPO-style stitched rooms** (`Leaning`). Chambers are hand-built rooms with doorway
   connectors, and each round stitches a set of them together into a maze. Every room is tagged
   with a difficulty, and the generator picks from the pool.
+  - **In the prototype** (2026-09-25): chambers stay separate rooms with a "lift" between them,
+    and **half of a run's chambers are generated** instead of hand-built. The generator makes a
+    fresh room each time from the pieces above, spending a difficulty budget: an easy one is a
+    plate and some crates; a hard one might hide the case in a closet, want a jar lobbed onto a
+    ledge button, need two plates held at once, and release two evil guys early. Every generated
+    chamber is checked solvable in the tests. `Open`: keep a mix, or go all-generated once there are
+    more kinds of piece? More pieces to add: sound locks, acid-melted panels, co-op holds.
 - **Difficulty ramps through the round** (`Leaning`): the further in you get, the more rooms and
-  the harder the rooms.
+  the harder the rooms. **In the prototype** (2026-09-25): three chambers, and a 3-chamber run
+  plays them easiest to hardest:
+  1. **Crates:** the exit plate, and no heavy case. Four crates side by side hold it; a jar or three
+     crates don't. Teaches weight.
+  2. **The first chamber:** the heavy case is in a closet behind a button door.
+  3. **Ledge:** the exit needs its plate held (the case) **and** a button on a 3.5 m ledge, out of
+     reach from the floor. You lob a jar at it (only jars fly far enough; crates are too heavy
+     to throw that high), which opens the exit for 5 s: get everyone through, or jam the door
+     with a crate. Standing on the case and jumping might also reach it, but then the case isn't
+     on the plate.
+  - `Open`: is the ledge button easy enough to spot from the floor and hit? Playtest it.
 - **Starting difficulty from the party's level** (`Leaning`): you don't start from level 1 each
   round. Before generating, look at the levels of everyone joining and set the difficulty to
   **`0.7 × average + 0.3 × highest`**. A plain average would let a strong player get carried, or
@@ -212,6 +229,17 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
   - Lore fit: the experimenters calibrate the test to the subjects they were given.
   - `Open`: what "level" is (character level, rebirths, upgrades owned?), and whether it's
     recomputed when someone joins mid-round.
+  - **In the prototype** (2026-09-25): "level" is the character's level. Level 1 starts a run at
+    the easiest chamber; a party at level 20 or more starts halfway up the list. Runs always end at
+    the hardest. It's worked out when a run starts, so someone joining mid-run doesn't change it.
+- **What a run pays** (`Leaning`, numbers to tune, 2026-09-25): **100 money and 50 XP for every
+  chamber passed**, even if the run then fails, **plus 200 money and 100 XP for passing the whole
+  run**. Everyone in the run gets the same (late joiners too). XP levels your character up (each
+  level takes 100 × its number in XP: 100 to reach level 2, 200 more for level 3). Money goes to
+  the scientist (the profile), not the rat, so every character shares it. The result screen shows
+  what you earned; nothing spends it yet.
+  - `Idea` (from above): pay a low-level player in a strong party more.
+  - `Open`: should faster chambers pay more (the clock is already there)?
 - `Open`: how many rooms per maze, and does failing (the whole team dying, running out of
   filters) end it? The upload lore says dying costs you the rat, not your progress.
 - `Open`: which Roblox factory game is the reference for Research mode? And how does that mode
@@ -341,6 +369,20 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 - `Open`: does death cost money or research? (The upload lore suggests death loses the rat's
   stuff but not your upgrades, see Lore.)
 - Hits flash your body for everyone else. For you, they crack your visor (see below).
+- **A downed player lies on the floor and still weighs something** (2026-09-25): lying on a
+  pressure plate, they hold it down. `Idea`: lean into it (dragging a downed teammate onto a plate
+  to hold a door is grim, funny, and very "they're just test subjects").
+
+### Players and each other (`Leaning`, 2026-09-25)
+
+- **You walk through your teammates.** Over the internet everyone sees the others a moment late,
+  so bumping into each other means bumping into where they *were*, which feels broken (and in
+  testing pushed a player through the floor). Teammates still count for plates, exits, doors and
+  enemies.
+- `Idea`: body-blocking or standing on a teammate's head (boosting up to a ledge) as a deliberate
+  mechanic later, if a puzzle wants it.
+- **What you carry feels instant**, whatever your ping: your own game moves it, and when you let
+  go it lands where you saw it land.
 
 ### The gas mask HUD (`Decided`)
 
@@ -474,9 +516,18 @@ filter, see Lore → "The mask is the lie".)
   standing on a platform doesn't just get you hit from below. It walks round and comes up.
   If you're somewhere it genuinely can't reach, it waits below and watches you.
 - Respawns **12 s** after dying (prototype convenience).
-- `Idea` (AI v3): learn habits (the spot you keep kiting to, the hiding place you reuse); react to
-  light (flashlights?); crouching for quieter movement; multiple evil guys that share what they
-  notice; distraction play (throw a crate to lure it away).
+- **AI v3** (`Decided` for the prototype, 2026-09-25):
+  - **It calls the pack.** Spotting you, it growls; any other evil guy that hears that growl comes
+    for *you*, not for the one that growled. Losing you, it growls again, and the others head for
+    where you were going. You hear every call too, so you know the pack is coming.
+  - **It waits at doors.** If you (or a noise) are somewhere it can't get to, like behind a shut
+    door, it waits by the door for 20 s, listening, and comes through the moment it opens. If there's
+    another way round, it takes it.
+  - **It learns your hiding spots.** Wherever it loses someone twice or more, it starts checking on
+    patrol, and first when searching nearby. Keep using the same trick and it stops working.
+  - **It can be lured**: a crash is just a noise at the crash, so throwing a crate draws it away.
+- `Idea` (later): react to light (flashlights?); crouching for quieter movement; more than one evil
+  guy per chamber so the pack actually forms (harder runs?).
 - `Open`: what is it, lore-wise? Can it be researched (evidence it leaves behind)?
 
 #### Player monsters on phones (`Idea`)

@@ -7,17 +7,32 @@ namespace RND.Maze;
 
 /// <summary>
 /// The end of a test chamber. The clock starts when the chamber loads; the test is passed once every
-/// living player is standing in this area at the same time. The host decides and tells everyone.
+/// living player is standing in this area at the same time. The host keeps the clock and decides;
+/// its synchronizer (a child) replicates both, including to late joiners.
 /// </summary>
 public partial class ChamberExit : Area3D
 {
 	public static ChamberExit Current { get; private set; }
 
-	public bool IsComplete { get; private set; }
-	public float Elapsed => IsComplete ? _finalTime : (float)(Now - _startedAt);
+	// Written by the host, replicated: the clock once a second (clients run it on between updates),
+	// and the result the moment it's decided.
+	[Export]
+	public float SyncElapsed
+	{
+		get => _syncElapsed;
+		set
+		{
+			_syncElapsed = value;
+			_syncedAt = Now;
+		}
+	}
+	[Export] public bool IsComplete { get; set; }
+	[Export] public float FinalTime { get; set; }
 
-	private double _startedAt;
-	private float _finalTime;
+	public float Elapsed => IsComplete ? FinalTime : _syncElapsed + (float)(Now - _syncedAt);
+
+	private float _syncElapsed;
+	private double _syncedAt;
 
 	private static double Now => Time.GetTicksMsec() / 1000.0;
 
@@ -34,9 +49,7 @@ public partial class ChamberExit : Area3D
 		CollisionLayer = 0;
 		CollisionMask = Layers.Players;
 		Monitorable = false;
-		// ponytail: each peer starts its own clock on load, so a late joiner's running clock is off
-		// (the final time comes from the host). Sync a start time when late joining matters.
-		_startedAt = Now;
+		_syncedAt = Now;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -44,18 +57,13 @@ public partial class ChamberExit : Area3D
 		if (IsComplete || !Multiplayer.IsServer())
 			return;
 
+		SyncElapsed = Elapsed;
 		var living = Player.All.Where(p => !p.IsDead).ToList();
 		var inside = GetOverlappingBodies();
 		if (living.Count > 0 && living.All(inside.Contains))
-			Rpc(MethodName.Complete, Elapsed);
-	}
-
-	// ponytail: a late joiner misses this and never sees the chamber as done. Sync the state
-	// (MultiplayerSynchronizer) once chambers chain into a maze.
-	[Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = true, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	private void Complete(float seconds)
-	{
-		IsComplete = true;
-		_finalTime = seconds;
+		{
+			FinalTime = Elapsed;
+			IsComplete = true;
+		}
 	}
 }

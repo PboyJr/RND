@@ -69,6 +69,8 @@ a { color: var(--accent); }
 .decided { background: var(--decided); } .leaning { background: var(--leaning); }
 .idea { background: var(--idea); } .open { background: var(--open); }
 
+.now { border: 1px solid var(--accent); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 14px; background: var(--accent-soft); }
+.now .label { color: var(--accent); }
 .secret { border: 1px dashed var(--open); border-radius: 6px; padding: 20px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }
 .secret .label { color: var(--open); }
 
@@ -103,6 +105,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <div class="wrap">
 <nav aria-label="Sections">
+	<a href="#now">Working on now</a>
 	<a href="#game">The game</a>
 	<a href="#secret">The secret</a>
 	<a href="#round">A round</a>
@@ -121,7 +124,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <main>
 <header>
-	<p class="eyebrow">Team handbook · updated 25 Sep 2026</p>
+	<p class="eyebrow">Team handbook · updated 26 Sep 2026</p>
 	<h1>RND<span>.</span></h1>
 	<p class="lede">A co-op horror game where a team of scientists goes into places where unknown creatures live to research and test them, and tries to get out alive.</p>
 	<p>This page is the plain-English version of where the project stands, so everyone is working from the same picture. Every idea carries a tag:</p>
@@ -132,6 +135,22 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<span><span class="pill open">Open</span> needs an answer</span>
 	</div>
 </header>
+
+<section id="now">
+	<h2>Working on now</h2>
+	<div class="now">
+		<p class="label">Just finished · 26 Sep 2026</p>
+		<p><strong>The big push: the hurdles we'd been putting off.</strong> All six jobs are done. <strong>Next up is a playtest by the team</strong> (see <a href="#next">What we're deciding next</a>).</p>
+		<ol>
+			<li><strong>Playing over a bad connection.</strong> <em>Done.</em> The game now gets tested with five players on a simulated bad internet connection (a quarter-second of lag, some messages lost, one player joining halfway through and one leaving while carrying something). That found and fixed nine real problems. The biggest: when you weren't the host, anything you carried trailed up to three metres behind you and could drop out of your hands. Now it moves instantly on your screen, whatever your connection.</li>
+			<li><strong>A version anyone can download and run.</strong> <em>Done.</em> Every change to the game now gets tested and turned into a Windows download automatically, on GitHub (the run page's <strong>RND-windows</strong> download). There's also a <strong>settings menu</strong> (in the main menu and on <kbd>Esc</kbd>): mouse sensitivity, field of view, three volume sliders, fullscreen, v-sync, and a 3D resolution slider for weaker computers.</li>
+			<li><strong>Rewards.</strong> <em>Done.</em> A maze run now pays money and experience: <span class="num">100</span> money and <span class="num">50</span> XP per chamber you get through (even if the run then fails), plus a bonus of <span class="num">200</span> and <span class="num">100</span> for finishing it. XP levels you up. It's saved on your computer, and the main menu shows your level, money and number of runs. A stronger team also starts its runs further up the difficulty ladder. Nothing to spend the money on yet.</li>
+			<li><strong>A smarter evil guy.</strong> <em>Done.</em> When it spots you it growls, and any other evil guy that hears it comes straight for you (and when it loses you, it tells them where you went). If you hide behind a shut door it waits by the door and comes in the moment it opens. And it learns: wherever players keep getting away, it starts checking.</li>
+			<li><strong>Rooms made fresh every run.</strong> <em>Done.</em> Half the chambers in a run are now built on the spot from the puzzle pieces we have (plates, crates, the case in a closet, a button up on a ledge, a second plate, and on the hardest ones two evil guys). The harder the chamber, the more pieces. Every player's game builds the exact same room, and the tests check that every such room can actually be solved.</li>
+			<li><strong>Playing with friends over the internet, through Steam.</strong> <em>Done, but needs trying with two accounts.</em> Have Steam open, click <strong>Host on Steam</strong>, and friends pick <strong>Join game</strong> on you in their Steam friends list (or invite them from the <kbd>Esc</kbd> menu). No IP addresses, no port forwarding. The whole five-player bad-connection test passes over Steam's connection too, but a friend joining through Steam's servers needs two computers with two Steam accounts, so the first real try is the playtest. For now the game shows up in Steam as "Spacewar", Valve's free test game.</li>
+		</ol>
+	</div>
+</section>
 
 <section id="game">
 	<h2>The game in one minute</h2>
@@ -180,12 +199,14 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><strong>Rooms are stitched together</strong> each round from a pool, getting harder the further in you go. <span class="pill leaning">Leaning</span></li>
 		<li><strong>Starting difficulty</strong> leans toward the strongest player, so a strong player can't be carried and nobody can game it with low-level friends. <span class="pill leaning">Leaning</span></li>
 		<li><strong>No portal gun</strong> for now. <span class="pill leaning">Leaning</span></li>
+		<li><strong>The evil guy is let loose</strong> 20 seconds into every chamber, with a growl everyone hears. A shut door stops him; an open one doesn't. <em>Built.</em></li>
+		<li><strong>A run is three chambers,</strong> easiest first. <em>Built:</em> three hand-made chambers, plus fresh generated ones (half of each run).</li>
 	</ul>
 </section>
 
 <section id="today">
 	<h2>What's playable today</h2>
-	<p>Two levels: a dark test room with a creature in it, and one grey-box test chamber. Up to a few players on the same network.</p>
+	<p>Two ways to play, picked by the host in the menu: a dark test room with a creature in it, and a <strong>maze run</strong> through three grey-box test chambers. Up to six players, on the same network or over the internet with Steam (<strong>Host on Steam</strong>, then friends pick <strong>Join game</strong> on you in their Steam friends list). Friends can join in the middle of a run.</p>
 	<div class="features">
 		<div>
 			<h3>Carrying</h3>
@@ -193,6 +214,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 				<li>Grab, carry, fling and throw crates, jars and a heavy case</li>
 				<li>Heavy things feel heavy</li>
 				<li>Push and pull what you're holding</li>
+				<li>What you carry moves instantly on your screen, even on a laggy connection, and lands where you dropped it</li>
 			</ul>
 		</div>
 		<div>
@@ -228,6 +250,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 				<li>Eyes show its mood: dim, orange (suspicious), bright red (hunting)</li>
 				<li>Searches where it last saw you, then gives up</li>
 				<li>Always walks a real path to you. You can outrun it by sprinting</li>
+				<li>Waits by a shut door if you hide behind it, and learns where you like to hide</li>
+				<li>Its growl calls any other evil guys over to you</li>
 			</ul>
 		</div>
 		<div>
@@ -235,7 +259,9 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 			<ul>
 				<li>The Scientist throws a flask of glowing acid: <span class="num">50</span> damage, <span class="num">2 m</span> splash, refills in <span class="num">5 s</span></li>
 				<li>You have <span class="num">100</span> health; it hits for <span class="num">20</span></li>
-				<li>Dead players respawn after <span class="num">8 s</span> (placeholder)</li>
+				<li>In the test room, dead players respawn after <span class="num">8 s</span> (placeholder)</li>
+				<li>In the maze you stay down until a teammate revives you</li>
+				<li>A maze run pays money and XP, and you level up (saved between sessions)</li>
 			</ul>
 		</div>
 	</div>
@@ -252,9 +278,10 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Right click</td><td>Throw what you're carrying</td></tr>
 		<tr><td>Scroll while carrying</td><td>Push it away or pull it closer</td></tr>
 		<tr><td><kbd>E</kbd></td><td>Press a button, or screw on a spare filter</td></tr>
+		<tr><td>Hold <kbd>E</kbd></td><td>Revive a downed teammate (<span class="num">3 s</span>, in the maze)</td></tr>
 		<tr><td><kbd>F2</kbd>–<kbd>F6</kbd></td><td>Switch visual effects on and off to compare looks</td></tr>
 		<tr><td><kbd>F7</kbd></td><td>Turn all sound off and on again</td></tr>
-		<tr><td><kbd>Esc</kbd></td><td>Free the mouse, leave the game</td></tr>
+		<tr><td><kbd>Esc</kbd></td><td>Pause menu: settings, invite Steam friends, leave the game</td></tr>
 	</table></div>
 </section>
 
@@ -269,15 +296,17 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Creature AI</td><td><span class="pill decided">Decided</span></td><td>Acts only on what it sees, hears and remembers</td></tr>
 		<tr><td>Hotbar</td><td><span class="pill decided">Decided</span></td><td>Slot 1 hands, 2–5 your kit</td></tr>
 		<tr><td>Saving characters</td><td><span class="pill decided">Decided</span></td><td>Saved on your own computer; the host sanity-checks it</td></tr>
+		<tr><td>Online play</td><td><span class="pill decided">Decided</span></td><td>Through Steam: friends join from their friends list. Still to try with two accounts</td></tr>
 		<tr><td>Twist stays hidden</td><td><span class="pill decided">Decided</span></td><td>Clues only, never spelled out</td></tr>
 		<tr><td>Round loop</td><td><span class="pill leaning">Leaning</span></td><td>Deploy, research, extract, hand in, upgrade</td></tr>
 		<tr><td>Art style</td><td><span class="pill leaning">Leaning</span></td><td>Mid-poly, comic-book shading, grainy camera</td></tr>
 		<tr><td>Classes</td><td><span class="pill leaning">Leaning</span></td><td>Each scientist type brings a kit; only the Scientist exists</td></tr>
-		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health, timed respawn as a stand-in</td></tr>
+		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health; timed respawn in the test room, teammate revive in the maze</td></tr>
 		<tr><td>Mind vs body damage</td><td><span class="pill leaning">Leaning</span></td><td>One health pool; mind damage can't kill you</td></tr>
 		<tr><td>Characters that rust</td><td><span class="pill leaning">Leaning</span></td><td>Benched characters get worse</td></tr>
+		<tr><td>Walking through teammates</td><td><span class="pill leaning">Leaning</span></td><td>Online, bumping into friends means bumping into where they were a moment ago, so you pass through them. A downed teammate still weighs down a plate</td></tr>
 		<tr><td>Rat lore</td><td><span class="pill idea">Idea</span></td><td>You are a rat with a human brain</td></tr>
-		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research</td></tr>
+		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research. The maze is being built first</td></tr>
 		<tr><td>Selling</td><td><span class="pill open">Open</span></td><td>Does selling stay at all? The black market idea is on hold</td></tr>
 		<tr><td>Research tree</td><td><span class="pill idea">Idea</span></td><td>Factorio-style, between rounds</td></tr>
 		<tr><td>Prestige</td><td><span class="pill idea">Idea</span></td><td>Phasmophobia-style rebirth</td></tr>
@@ -288,13 +317,14 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <section id="next">
 	<h2>What we're deciding next</h2>
-	<p>The maze is in progress (next: chain chambers together, then add the evil guy to them). After that, pick one:</p>
+	<p>The big push is done (see <a href="#now">Working on now</a>). Pick one:</p>
 	<div class="table"><table>
 		<tr><th>Option</th><th>What it gets us</th></tr>
-		<tr><td>Loot + round loop ★</td><td>Recommended. Turns the tech demo into a game: loot with value that loses money when it breaks, an extraction point, a timer and a payout.</td></tr>
+		<tr><td>Playtest ★</td><td>Recommended. Nobody has played any of the new stuff yet: the chambers, the generated rooms, the evil guys calling each other, carrying on a laggy connection. With Steam it can happen over the internet, which also gives online play its first real try. Tells us what to do next.</td></tr>
+		<tr><td>Somewhere to spend money</td><td>The between-run hub and research tree, so runs lead somewhere. Needs us to decide what the upgrades are.</td></tr>
+		<tr><td>Loot + round loop</td><td>The R.E.P.O.-style mode: loot that loses value when it breaks, an extraction point, a timer and a payout.</td></tr>
+		<tr><td>Voice chat by distance</td><td>The R.E.P.O. social magic. Steam's voice chat is the easy route now that Steam is in.</td></tr>
 		<tr><td>Combat polish</td><td>Fighting feels good: acid puddles, the creature reacting to thrown things, better death.</td></tr>
-		<tr><td>Steam + online play</td><td>Friends can play over the internet. Needed before any remote playtest.</td></tr>
-		<tr><td>Voice chat by distance</td><td>The R.E.P.O. social magic. Easiest after Steam.</td></tr>
 	</table></div>
 </section>
 
@@ -304,7 +334,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<ul class="questions">
 		<li><span class="label">Loot</span><span>Does loot have a value that drops when it gets damaged? Is there research you don't carry (photos, recordings, readings)?</span></li>
 		<li><span class="label">Selling</span><span>Does selling stay now that the game is about research and testing? What does research earn you? If the black market stays, how do you get caught and who pays the fine?</span></li>
-		<li><span class="label">Death</span><span>Timed respawn, a teammate revives you, or out for the round? What exactly do you lose?</span></li>
+		<li><span class="label">Death</span><span>The maze uses teammate revive now. Should the rest of the game too? What exactly do you lose when you die?</span></li>
 		<li><span class="label">Healing</span><span>Right now only respawning heals. Should anything else?</span></li>
 		<li><span class="label">Characters</span><span>Which abilities get rusty, how fast, and can you train them back? Are upgrades per character or shared?</span></li>
 		<li><span class="label">Classes</span><span>Which other scientist types exist, and what do they carry?</span></li>
@@ -313,7 +343,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><span class="label">Readability</span><span>Do the cracks and HUD glitches read clearly enough to drop the debug bars?</span></li>
 		<li><span class="label">Lore</span><span>What is the evil guy, to a rat? How does the madness build and go away?</span></li>
 		<li><span class="label">Modes</span><span>What do payload and research play like? Picked per round, per run, or voted?</span></li>
-		<li><span class="label">Maze</span><span>How many rooms? Does the whole team dying end it?</span></li>
+		<li><span class="label">Maze</span><span>Is three chambers the right length for a run? For now, everyone being down at once fails the run: is that right?</span></li>
 		<li><span class="label">Monsters</span><span>What can monster players do, how many per match, phone or PC?</span></li>
 		<li><span class="label">Look</span><span>Keep the grain if we keep the comic-book shading?</span></li>
 		<li><span class="label">Name</span><span>"RND" is a working title. What's the real one?</span></li>
@@ -326,7 +356,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<ul>
 		<li>Footstep sounds, hearing teammates breathe, retuning or recording real sounds</li>
 		<li>Deeper filter: swaps that take time, gas zones, filter types</li>
-		<li>Smarter creature: learns your habits, reacts to light, several that share what they notice</li>
+		<li>Smarter creature: reacts to light, crouching past it, more than one per chamber</li>
 		<li>More scientist types, more creatures, more kinds of research</li>
 		<li>The between-round hub, research tree, crate opening, prestige</li>
 		<li>Saved characters (designed, not built)</li>
@@ -339,15 +369,18 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>Known rough edges</h2>
 	<p>On purpose for now, so don't file these as bugs:</p>
 	<ul>
-		<li>You can only play together <strong>on the same network</strong>. Online play comes with Steam.</li>
-		<li>Names above players show numbers, not names (also comes with Steam).</li>
+		<li>Online play through Steam hasn't been tried between two accounts yet. Invites from the <kbd>Esc</kbd> menu need the Steam overlay, which may only work when the game is started from Steam; joining from the friends list doesn't need it.</li>
+		<li>Names above players show numbers, not Steam names yet.</li>
 		<li>Walking into props doesn't push them; you have to grab them.</li>
 		<li>No crouching or stamina yet.</li>
-		<li>Death is a placeholder: you tip over and come back after 8 seconds.</li>
-		<li>Only one creature type, and it can drop down ledges but can't jump up.</li>
+		<li>Death is a placeholder: you tip over. In the test room you come back after 8 seconds.</li>
+		<li>Only one creature type, and only one per level, so the pack behaviour never shows up yet. It can drop down ledges but can't jump up.</li>
 		<li>Sounds are placeholders, tuned by numbers rather than by ear.</li>
-		<li>Solving the test chamber doesn't lead anywhere yet. There's only one.</li>
-		<li>The chamber's plates, buttons and doors haven't been tested with several players yet, and they don't have their own sounds.</li>
+		<li>Money from maze runs has nothing to be spent on yet, and after the result screen a new run starts on its own.</li>
+		<li>The hand-made and generated chambers haven't been playtested yet, and generated rooms all use the same few pieces.</li>
+		<li>The chamber's plates, buttons and doors don't have their own sounds yet.</li>
+		<li>You walk straight through your teammates. That's deliberate (see the table above).</li>
+		<li>Grabbing something takes a moment on a laggy connection, because the host has to agree you got it first.</li>
 		<li>If the game acts strangely right after pulling new code, close Godot completely and reopen it.</li>
 	</ul>
 </section>
@@ -356,11 +389,11 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>How it's built</h2>
 	<ul>
 		<li><strong>Godot 4.7 (.NET edition) with C#.</strong> Everyone must use the same Godot version.</li>
-		<li><strong>One player hosts</strong> and everyone else joins them. No servers to run. The host is in charge of anything shared (props, health, the creature) so nobody's game disagrees; your own movement is handled on your machine so it feels instant.</li>
+		<li><strong>One player hosts</strong> and everyone else joins them. No servers to run. The host is in charge of anything shared (props, health, the creature) so nobody's game disagrees; your own movement, and whatever you're carrying, is handled on your machine so it feels instant.</li>
 		<li><strong>Jolt physics</strong>, because stacking and carrying is the heart of the game.</li>
 		<li><strong>All sound is generated in code.</strong> There are no audio files yet.</li>
-		<li><strong>Steam, voice chat and our own server</strong> are planned but not chosen.</li>
-		<li><strong>Automated tests</strong> start the game without a window and check that levels load, combat works and two players can connect.</li>
+		<li><strong>Online play goes through Steam:</strong> friends connect through Valve's servers, so nobody needs an IP address or port forwarding. On the same network you can still join by IP address. Voice chat and our own server are planned but not chosen.</li>
+		<li><strong>Automated tests</strong> start the game without a window and check that levels load and combat works, and have up to five players play a whole maze run together over a simulated bad internet connection (on our own connection code or on Steam's). They run on GitHub every time someone uploads a change, which also produces a Windows build to download.</li>
 	</ul>
 	<p class="muted">Setup steps are in the repo's README.</p>
 </section>
@@ -387,6 +420,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<dt>Mental damage</dt><dd>Damage to your mind rather than your body. Scrambles the HUD instead of cracking the glass, and can't kill you.</dd>
 		<dt>Psychosis</dt><dd>Working name for seeing the truth: you and your friends look like rats.</dd>
 		<dt>Test chamber</dt><dd>One puzzle room in the maze mode.</dd>
+		<dt>Maze run</dt><dd>Three test chambers in a row, easiest first. Pass them all to pass the run; if everyone is down at once, the run fails.</dd>
 		<dt>Kit</dt><dd>The items a scientist type carries in hotbar slots 2–5.</dd>
 		<dt>Host</dt><dd>The player whose game everyone else joins.</dd>
 		<dt>Grey-box</dt><dd>A level made of plain blocks to test gameplay before art.</dd>
