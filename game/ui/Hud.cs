@@ -62,6 +62,7 @@ public partial class Hud : Control
 
 		GetNode<Button>("%Resume").Pressed += () => SetPaused(false);
 		GetNode<Button>("%Leave").Pressed += () => Network.Instance.Leave();
+		GetNode<Button>("%Invite").Pressed += () => Network.Instance.InviteFriends();
 		// The settings panel takes the pause menu's place, and gives it back when it closes.
 		GetNode<Button>("%Settings").Pressed += () =>
 		{
@@ -152,6 +153,7 @@ public partial class Hud : Control
 	private void SetPaused(bool paused)
 	{
 		_pauseMenu.Visible = paused;
+		GetNode<Control>("%Invite").Visible = Network.Instance.CanInvite;
 		Input.MouseMode = paused ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
 	}
 }

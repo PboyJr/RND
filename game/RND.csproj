@@ -5,4 +5,12 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>RND</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Facepunch.Steamworks" Version="2.3.3" GeneratePathProperty="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Steam's native library. The package ships it the old way, which isn't copied by itself. -->
+    <None Include="$(PkgFacepunch_Steamworks)/content/steam_api64.dll" Link="steam_api64.dll" Visible="false"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

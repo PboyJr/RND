@@ -3,6 +3,7 @@ extends Node
 ## Headless smoke test. Run from the game/ folder:
 ##   godot --headless res://tests/smoke_test.tscn -- --role=scenes
 ##   godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --ping=150 --jitter=20 --loss=2
+##     (add --steam=1 to play it over Steam's sockets instead of ENet; Steam must be running)
 ## The network role hosts and starts its own clients (the last joins mid-run), optionally behind a
 ## fake bad connection, and plays the sandbox and a whole maze run (see net_suite.gd). Client logs
 ## go to --out. By hand, in two terminals: --role=host (first), then --role=client.
@@ -858,6 +859,11 @@ func _run_network() -> void:
 	net.ping = float(_arg("ping", "0"))
 	if not _check(net.total <= net.MAX_CLIENTS, "the network test plays at most %d clients" % net.MAX_CLIENTS):
 		return
+	# --steam: the same test over Steam's networking sockets (Steam must be running) instead of ENet.
+	if _arg("steam", "0") == "1":
+		_network.DirectOverSteam = true
+		if not _check(_network.StartSteam(), "--steam: couldn't connect to Steam (is it running?)"):
+			return
 	add_child(net)
 	match _role:
 		"network":

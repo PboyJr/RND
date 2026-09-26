@@ -884,7 +884,7 @@ It can happen on any level change, so it's the likely cause of "the evil guy saw
 his spawn" (noted earlier as stale editor state). Our maps are small, so updating them in step
 costs nothing noticeable.
 
-## 2026-09-25: Steam plan (`Leaning`, waiting on the team's OK to add the package)
+## 2026-09-25: Steam plan (built 2026-09-26, see "Steam transport built" below)
 
 **Recommendation:** **Facepunch.Steamworks** (MIT, C#, one NuGet package that includes
 `steam_api64.dll`) over GodotSteam (a C++ engine extension; from C# it's reached through untyped
@@ -897,7 +897,7 @@ The plan, all inside `core/` so gameplay code doesn't change:
   `JoinSteam(lobby)` connects to the lobby owner. Accepting an invite (Steam overlay) or joining
   from the friends list calls it. The main menu gets "Host on Steam" / "Invite friends"; the IP
   box stays for LAN.
-- Development uses Steam's test app id **480** (`steam_appid.txt` next to the project, not
+- Development uses Steam's test app id **480** (set in code; no `steam_appid.txt` needed, and not
   shipped). A real app id needs the $100 Steam Direct fee.
 - One thing to change first: our level-change handshake relies on ENet keeping a channel's
   reliable and unreliable messages in order. Steam doesn't promise that across the two, so the
@@ -905,8 +905,36 @@ The plan, all inside `core/` so gameplay code doesn't change:
 - **Testing needs two computers with two Steam accounts** (Steam allows one account per machine),
   so the last step is a playtest by the team. The network smoke test keeps running on ENet.
 
-**Blocked on:** permission to download the package from nuget.org (about 3 MB), and confirming
-app id 480 for now.
+*(The team said yes on 2026-09-26.)*
+
+## 2026-09-26: Steam transport built (`Decided`, relay still to try with two accounts)
+
+Built as planned (Facepunch.Steamworks 2.3.3, Steam test app id 480), with two changes:
+- **Ordering lives in the Steam peer, not in gameplay.** Instead of tagging player reports with the
+  level they belong to, `core/SteamPeer.cs` copies ENet's rule: on a channel other than 0, an
+  unreliable-ordered message is dropped if a reliable message sent after it has already arrived
+  (each message carries the sender's reliable count for its channel). Gameplay code and the
+  level-change handshake stay transport-blind.
+- **The host hands out peer ids** (a welcome message, reliable, so it arrives first), like ENet,
+  instead of hashing Steam ids. That's also what lets several test clients share one Steam account.
+
+How it fits together:
+- `Network.StartSteam()` runs at startup (not in headless runs) if Steam is running; callbacks are
+  pumped in `Network._Process`, on the main thread. No Steam just means no Steam button.
+- **Host on Steam** (main menu) opens a relay listen socket and a friends-only lobby. Friends join
+  from their friends list ("Join game") or an invite (pause menu → Invite Steam friends, which
+  needs the Steam overlay); both arrive as a lobby join, and the game connects to the lobby's
+  owner. A game that isn't running is started with `+connect_lobby <id>`, which we read too.
+- The host only lets in its Steam friends and people in its lobby.
+- Steam's native library (`steam_api64.dll`) is copied next to our assemblies by the csproj, and a
+  resolver in `Network` loads it from there: Godot loads our assemblies from memory, so .NET
+  wouldn't look in that folder by itself.
+- **Testing on one computer:** `--steam=1` on the network smoke test makes Host / Join by address
+  use Steam's sockets over plain UDP instead of ENet (`Network.DirectOverSteam`), so the whole test
+  (lag proxy included) runs through `SteamPeer`. It passes with 1 client, 3 at 150 ms / 2% loss and
+  4 at 250 ms / 5% loss. Hosting through the relay with a lobby works on one computer; a friend
+  actually connecting through the relay needs a second Steam account, so that's the team's
+  playtest. CI keeps testing ENet (no Steam on the build machine).
 
 ## Known limitations / tech debt
 
@@ -914,7 +942,9 @@ Things the prototype does on purpose that we'll need to revisit:
 
 - Props sync position every tick even when asleep. Fine for a few dozen props; optimise later
   (sleep-aware sync, lower rate).
-- Name labels show peer ids. Real names come with Steam.
+- Name labels show peer ids. Steam names need the host to pass each player's name on (not done yet).
+- Steam: joining through the relay hasn't been tried with two accounts yet (see "Steam transport
+  built"). Invites need the Steam overlay, which may only work when the game is started from Steam.
 - Walking into props doesn't push them (clients see frozen copies). Grabbing is the only way to
   move them.
 - No crouch or stamina yet.

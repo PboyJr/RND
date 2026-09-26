@@ -77,6 +77,13 @@ you host; allow it on private networks.
 
 Running a level scene directly (F6) also works: you play offline as the host.
 
+## Playing with friends over Steam
+
+Have Steam running before you start the game. Click **Host on Steam**, then friends pick **Join
+game** on you in their Steam friends list (or use **Esc → Invite Steam friends**, which needs the
+Steam overlay). Nobody needs an IP address or port forwarding. For now the game shows up in Steam
+as "Spacewar" (Valve's free test app id); that changes once we have our own.
+
 ## Controls
 
 | Input | Action |
@@ -91,7 +98,7 @@ Running a level scene directly (F6) also works: you play offline as the host.
 | E on (or holding) a spare filter | Screw it onto your mask |
 | F2 – F6 | Debug view switches, to compare looks: cel shading, outlines, film grain, colour crush, lens (glass curve, edge blur, fringe). Pressing one lists what's on, top right |
 | F7 | Mute / unmute all sound (debug) |
-| Esc | Pause menu: settings (sensitivity, field of view, volume, fullscreen, v-sync, 3D resolution), leave session |
+| Esc | Pause menu: settings (sensitivity, field of view, volume, fullscreen, v-sync, 3D resolution), invite Steam friends, leave session |
 
 You see everything through a gas mask. **The cracks in the glass are your health** (each hit
 cracks the side it came from); there's no health number, except a plain debug bar in the corner. Your **filter** runs down (faster when you
@@ -136,8 +143,8 @@ docs/        Design, decisions, roadmap
   decides who holds what. The one exception is the prop you're carrying: your game simulates its
   own copy (so it has no lag), and the host carries on from where your copy was when you let go.
 - **Level changes wait for clients** to stop reporting, so nothing arrives for a level that's gone.
-- **Transport lives in `core/Network.cs`.** Swapping ENet for Steam (or a relay) happens there,
-  without touching gameplay code.
+- **Transport lives in `core/`.** ENet by IP address, or Steam (`SteamPeer`: Valve's relay, friends-only
+  lobbies). `Network.cs` picks one; gameplay code can't tell which.
 
 ## Smoke test
 
@@ -147,6 +154,7 @@ docs/        Design, decisions, roadmap
 ```
 godot --headless res://tests/smoke_test.tscn -- --role=scenes    # scenes load; level, combat, chambers, a run offline
 godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --ping=150 --jitter=20 --loss=2
+godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --steam=1   # the same over Steam's sockets (Steam running)
 ```
 
 The network role hosts and starts its own clients (up to 4; the last one joins mid-run), each

@@ -124,7 +124,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <main>
 <header>
-	<p class="eyebrow">Team handbook · updated 25 Sep 2026</p>
+	<p class="eyebrow">Team handbook · updated 26 Sep 2026</p>
 	<h1>RND<span>.</span></h1>
 	<p class="lede">A co-op horror game where a team of scientists goes into places where unknown creatures live to research and test them, and tries to get out alive.</p>
 	<p>This page is the plain-English version of where the project stands, so everyone is working from the same picture. Every idea carries a tag:</p>
@@ -139,17 +139,16 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 <section id="now">
 	<h2>Working on now</h2>
 	<div class="now">
-		<p class="label">In progress · 25 Sep 2026</p>
-		<p><strong>The big push: the hurdles we'd been putting off.</strong> Six jobs, in this order:</p>
+		<p class="label">Just finished · 26 Sep 2026</p>
+		<p><strong>The big push: the hurdles we'd been putting off.</strong> All six jobs are done. <strong>Next up is a playtest by the team</strong> (see <a href="#next">What we're deciding next</a>).</p>
 		<ol>
 			<li><strong>Playing over a bad connection.</strong> <em>Done.</em> The game now gets tested with five players on a simulated bad internet connection (a quarter-second of lag, some messages lost, one player joining halfway through and one leaving while carrying something). That found and fixed nine real problems. The biggest: when you weren't the host, anything you carried trailed up to three metres behind you and could drop out of your hands. Now it moves instantly on your screen, whatever your connection.</li>
-			<li><strong>A version anyone can download and run.</strong> <em>Done, almost.</em> Every change to the game now gets tested and turned into a Windows download automatically. The first automatic build happens once this work is uploaded. There's also a <strong>settings menu</strong> (in the main menu and on <kbd>Esc</kbd>): mouse sensitivity, field of view, three volume sliders, fullscreen, v-sync, and a 3D resolution slider for weaker computers.</li>
+			<li><strong>A version anyone can download and run.</strong> <em>Done.</em> Every change to the game now gets tested and turned into a Windows download automatically, on GitHub (the run page's <strong>RND-windows</strong> download). There's also a <strong>settings menu</strong> (in the main menu and on <kbd>Esc</kbd>): mouse sensitivity, field of view, three volume sliders, fullscreen, v-sync, and a 3D resolution slider for weaker computers.</li>
 			<li><strong>Rewards.</strong> <em>Done.</em> A maze run now pays money and experience: <span class="num">100</span> money and <span class="num">50</span> XP per chamber you get through (even if the run then fails), plus a bonus of <span class="num">200</span> and <span class="num">100</span> for finishing it. XP levels you up. It's saved on your computer, and the main menu shows your level, money and number of runs. A stronger team also starts its runs further up the difficulty ladder. Nothing to spend the money on yet.</li>
 			<li><strong>A smarter evil guy.</strong> <em>Done.</em> When it spots you it growls, and any other evil guy that hears it comes straight for you (and when it loses you, it tells them where you went). If you hide behind a shut door it waits by the door and comes in the moment it opens. And it learns: wherever players keep getting away, it starts checking.</li>
 			<li><strong>Rooms made fresh every run.</strong> <em>Done.</em> Half the chambers in a run are now built on the spot from the puzzle pieces we have (plates, crates, the case in a closet, a button up on a ledge, a second plate, and on the hardest ones two evil guys). The harder the chamber, the more pieces. Every player's game builds the exact same room, and the tests check that every such room can actually be solved.</li>
-			<li><strong>Steam:</strong> play with friends over the internet. <em>Planned, waiting on a yes from the team</em> to add the Steam library, and it needs two computers with two Steam accounts to test.</li>
+			<li><strong>Playing with friends over the internet, through Steam.</strong> <em>Done, but needs trying with two accounts.</em> Have Steam open, click <strong>Host on Steam</strong>, and friends pick <strong>Join game</strong> on you in their Steam friends list (or invite them from the <kbd>Esc</kbd> menu). No IP addresses, no port forwarding. The whole five-player bad-connection test passes over Steam's connection too, but a friend joining through Steam's servers needs two computers with two Steam accounts, so the first real try is the playtest. For now the game shows up in Steam as "Spacewar", Valve's free test game.</li>
 		</ol>
-		<p><strong>Also still to do:</strong> playtest the three test chambers (can you spot the ledge button, and hit it?).</p>
 	</div>
 </section>
 
@@ -207,7 +206,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <section id="today">
 	<h2>What's playable today</h2>
-	<p>Two ways to play, picked by the host in the menu: a dark test room with a creature in it, and a <strong>maze run</strong> through three grey-box test chambers. Up to six players on the same network; friends can join in the middle of a run.</p>
+	<p>Two ways to play, picked by the host in the menu: a dark test room with a creature in it, and a <strong>maze run</strong> through three grey-box test chambers. Up to six players, on the same network or over the internet with Steam (<strong>Host on Steam</strong>, then friends pick <strong>Join game</strong> on you in their Steam friends list). Friends can join in the middle of a run.</p>
 	<div class="features">
 		<div>
 			<h3>Carrying</h3>
@@ -282,7 +281,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Hold <kbd>E</kbd></td><td>Revive a downed teammate (<span class="num">3 s</span>, in the maze)</td></tr>
 		<tr><td><kbd>F2</kbd>–<kbd>F6</kbd></td><td>Switch visual effects on and off to compare looks</td></tr>
 		<tr><td><kbd>F7</kbd></td><td>Turn all sound off and on again</td></tr>
-		<tr><td><kbd>Esc</kbd></td><td>Pause menu: settings, leave the game</td></tr>
+		<tr><td><kbd>Esc</kbd></td><td>Pause menu: settings, invite Steam friends, leave the game</td></tr>
 	</table></div>
 </section>
 
@@ -297,6 +296,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Creature AI</td><td><span class="pill decided">Decided</span></td><td>Acts only on what it sees, hears and remembers</td></tr>
 		<tr><td>Hotbar</td><td><span class="pill decided">Decided</span></td><td>Slot 1 hands, 2–5 your kit</td></tr>
 		<tr><td>Saving characters</td><td><span class="pill decided">Decided</span></td><td>Saved on your own computer; the host sanity-checks it</td></tr>
+		<tr><td>Online play</td><td><span class="pill decided">Decided</span></td><td>Through Steam: friends join from their friends list. Still to try with two accounts</td></tr>
 		<tr><td>Twist stays hidden</td><td><span class="pill decided">Decided</span></td><td>Clues only, never spelled out</td></tr>
 		<tr><td>Round loop</td><td><span class="pill leaning">Leaning</span></td><td>Deploy, research, extract, hand in, upgrade</td></tr>
 		<tr><td>Art style</td><td><span class="pill leaning">Leaning</span></td><td>Mid-poly, comic-book shading, grainy camera</td></tr>
@@ -317,14 +317,13 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <section id="next">
 	<h2>What we're deciding next</h2>
-	<p>The big push is nearly done (see <a href="#now">Working on now</a>). After it, pick one:</p>
+	<p>The big push is done (see <a href="#now">Working on now</a>). Pick one:</p>
 	<div class="table"><table>
 		<tr><th>Option</th><th>What it gets us</th></tr>
-		<tr><td>Playtest ★</td><td>Recommended. Nobody has played any of the new stuff yet: the chambers, the generated rooms, the evil guys calling each other, carrying on a laggy connection. Tells us what to do next.</td></tr>
+		<tr><td>Playtest ★</td><td>Recommended. Nobody has played any of the new stuff yet: the chambers, the generated rooms, the evil guys calling each other, carrying on a laggy connection. With Steam it can happen over the internet, which also gives online play its first real try. Tells us what to do next.</td></tr>
 		<tr><td>Somewhere to spend money</td><td>The between-run hub and research tree, so runs lead somewhere. Needs us to decide what the upgrades are.</td></tr>
-		<tr><td>Steam + online play</td><td>Friends can play over the internet. Planned; needs a yes.</td></tr>
 		<tr><td>Loot + round loop</td><td>The R.E.P.O.-style mode: loot that loses value when it breaks, an extraction point, a timer and a payout.</td></tr>
-		<tr><td>Voice chat by distance</td><td>The R.E.P.O. social magic. Easiest after Steam.</td></tr>
+		<tr><td>Voice chat by distance</td><td>The R.E.P.O. social magic. Steam's voice chat is the easy route now that Steam is in.</td></tr>
 		<tr><td>Combat polish</td><td>Fighting feels good: acid puddles, the creature reacting to thrown things, better death.</td></tr>
 	</table></div>
 </section>
@@ -370,8 +369,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>Known rough edges</h2>
 	<p>On purpose for now, so don't file these as bugs:</p>
 	<ul>
-		<li>You can only play together <strong>on the same network</strong>. Online play comes with Steam.</li>
-		<li>Names above players show numbers, not names (also comes with Steam).</li>
+		<li>Online play through Steam hasn't been tried between two accounts yet. Invites from the <kbd>Esc</kbd> menu need the Steam overlay, which may only work when the game is started from Steam; joining from the friends list doesn't need it.</li>
+		<li>Names above players show numbers, not Steam names yet.</li>
 		<li>Walking into props doesn't push them; you have to grab them.</li>
 		<li>No crouching or stamina yet.</li>
 		<li>Death is a placeholder: you tip over. In the test room you come back after 8 seconds.</li>
@@ -393,8 +392,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><strong>One player hosts</strong> and everyone else joins them. No servers to run. The host is in charge of anything shared (props, health, the creature) so nobody's game disagrees; your own movement, and whatever you're carrying, is handled on your machine so it feels instant.</li>
 		<li><strong>Jolt physics</strong>, because stacking and carrying is the heart of the game.</li>
 		<li><strong>All sound is generated in code.</strong> There are no audio files yet.</li>
-		<li><strong>Steam, voice chat and our own server</strong> are planned but not chosen.</li>
-		<li><strong>Automated tests</strong> start the game without a window and check that levels load and combat works, and have up to five players play a whole maze run together over a simulated bad internet connection. They run on GitHub every time someone uploads a change, which also produces a Windows build to download.</li>
+		<li><strong>Online play goes through Steam:</strong> friends connect through Valve's servers, so nobody needs an IP address or port forwarding. On the same network you can still join by IP address. Voice chat and our own server are planned but not chosen.</li>
+		<li><strong>Automated tests</strong> start the game without a window and check that levels load and combat works, and have up to five players play a whole maze run together over a simulated bad internet connection (on our own connection code or on Steam's). They run on GitHub every time someone uploads a change, which also produces a Windows build to download.</li>
 	</ul>
 	<p class="muted">Setup steps are in the repo's README.</p>
 </section>

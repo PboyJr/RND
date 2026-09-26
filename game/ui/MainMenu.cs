@@ -10,6 +10,7 @@ public partial class MainMenu : Control
 	private LineEdit _address;
 	private Button _host;
 	private Button _join;
+	private Button _hostSteam;
 	private Label _status;
 	private OptionButton _level;
 	private Label _profile;
@@ -19,6 +20,7 @@ public partial class MainMenu : Control
 		_address = GetNode<LineEdit>("%Address");
 		_host = GetNode<Button>("%Host");
 		_join = GetNode<Button>("%Join");
+		_hostSteam = GetNode<Button>("%HostSteam");
 		_status = GetNode<Label>("%Status");
 		_level = GetNode<OptionButton>("%Level");
 		_profile = GetNode<Label>("%Profile");
@@ -26,8 +28,15 @@ public partial class MainMenu : Control
 
 		_host.Pressed += OnHostPressed;
 		_join.Pressed += OnJoinPressed;
+		_hostSteam.Pressed += OnHostSteamPressed;
+		Network.Instance.Joining += message =>
+		{
+			_status.Text = message;
+			SetBusy(true);
+		};
 		GetNode<Button>("%Settings").Pressed += () => SettingsMenu.Instance?.Open();
 		_address.TextSubmitted += _ => OnJoinPressed();
+		SetBusy(false);
 	}
 
 	/// <summary>The index into Main.Levels the host will load.</summary>
@@ -55,6 +64,13 @@ public partial class MainMenu : Control
 			_status.Text = $"Couldn't host on port {Network.DefaultPort} ({error}). Is another copy already hosting?";
 	}
 
+	private void OnHostSteamPressed()
+	{
+		Error error = Network.Instance.HostSteam();
+		if (error != Error.Ok)
+			_status.Text = $"Couldn't host on Steam ({error}).";
+	}
+
 	private void OnJoinPressed()
 	{
 		(string address, int port) = ParseAddress(_address.Text);
@@ -80,6 +96,8 @@ public partial class MainMenu : Control
 	{
 		_host.Disabled = busy;
 		_join.Disabled = busy;
+		_hostSteam.Disabled = busy || !Network.Instance.SteamReady;
+		_hostSteam.TooltipText = Network.Instance.SteamReady ? "Friends join from their Steam friends list, or invite them from the pause menu" : "Start Steam first, then restart the game";
 	}
 
 	// Accepts "1.2.3.4" or "1.2.3.4:7777".

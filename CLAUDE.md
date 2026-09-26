@@ -35,7 +35,9 @@ section says what's in progress: update it whenever the current task starts, cha
 - Smoke tests (headless, from `game/`): see README. Run `--role=scenes`, and for networking
   changes `--role=network` (it starts its own clients; try `--clients=3 --ping=150 --jitter=20
   --loss=2`, and `--clients=4 --ping=250 --jitter=40 --loss=5` for a stress run; client logs go
-  to `--out`). Use Godot's `_console.exe` on Windows to see output.
+  to `--out`). Use Godot's `_console.exe` on Windows to see output. Changes to
+  `core/SteamPeer.cs` or the Steam side of `Network.cs`: also run the network role with `--steam=1`
+  (Steam must be running; the whole test then goes through Steam's sockets on this computer).
   Always wrap runs in a timeout: if the test script fails to parse, Godot never quits.
 - Conventions: feature folders, one namespace per folder (`RND.Core`, `RND.Players`, ...), tabs,
   file-scoped namespaces, scripts next to their scenes.

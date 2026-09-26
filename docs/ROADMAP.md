@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (M9 network hardening done; the big push is under way)
+Last updated: 2026-09-26 (the big push is done; Steam needs a two-account playtest)
 
 ---
 
@@ -148,8 +148,9 @@ The team asked for "all of it": the hurdles we hadn't tackled yet, worked throug
 1. [x] **Network hardening** (details below)
 2. [x] **A build anyone can run:** Windows export preset, CI (build, both smoke tests, Windows
        build to download on every push), settings menu (sensitivity, field of view, three
-       volumes, fullscreen, v-sync, 3D resolution) saved to disk. *Still to see:* the first CI run
-       (after the branch is pushed) and a local export (needs the ~1 GB export templates)
+       volumes, fullscreen, v-sync, 3D resolution) saved to disk. CI is green and its Windows build
+       downloads from the run page; a local export works too. (The very first CI run crashed once in
+       the offline test and the rerun passed; failures now show the log's end on the run page.)
 3. [x] **Rewards and saving:** a run pays money and XP into each player's own profile (saved safely, levels up); the party's level sets the starting difficulty. *Still to do:* something to spend money on
 4. [x] **Enemy AI v3:** the pack converges on a spotter's growl, waits at shut doors (and comes
        through when they open), learns where players keep getting away. The hardest generated
@@ -159,9 +160,9 @@ The team asked for "all of it": the hurdles we hadn't tackled yet, worked throug
        every peer builds the same room from the seed. Half of a run's chambers are generated. 90 of 90
        swept chambers solve from their plan. (Found and fixed: async navigation map updates dropping a
        new level's navmesh.)
-6. [ ] **Steam lobbies and relay:** friends over the internet. *Planned* (see DECISIONS → Steam plan):
-       Facepunch.Steamworks, a Steam peer in `core/`, friends-only lobbies with overlay invites.
-       *Waiting on:* the team's OK to add the package, then a two-computer playtest
+6. [x] **Steam lobbies and relay:** "Host on Steam" opens a friends-only lobby; friends join from
+       their friends list or an invite. The whole network test passes over the Steam transport
+       (`--steam=1`). *Still to do:* a two-computer, two-account playtest of joining through the relay
 
 ### M9: Network hardening ✅ (2026-09-25)
 
@@ -189,9 +190,8 @@ and leaving.
 
 | Option | What it proves | Notes |
 | --- | --- | --- |
-| **Playtest what's there** ⭐ | Whether it's fun | Nothing in the big push has been played by a person: the chambers (can you spot and hit the ledge button?), generated rooms, the pack of evil guys, carrying online. Cheap, and it should steer everything below. |
+| **Playtest what's there** ⭐ | Whether it's fun | Nothing in the big push has been played by a person: the chambers (can you spot and hit the ledge button?), generated rooms, the pack of evil guys, carrying online. Now possible over the internet with Steam, which also tests joining through the relay. Cheap, and it should steer everything below. |
 | **Somewhere to spend the pay** | The loop closes: runs → money → upgrades → better runs | The between-run hub / research tree (DESIGN: Factorio-style). Needs the team to decide what the upgrades are. |
-| **Steam lobbies + relay** | Friends can play over the internet | Planned (DECISIONS → Steam plan); waiting on the OK to add the package. Needed before any remote playtest. |
 | **Valuables + retrieval round** | The second mode, the one most like REPO | Research props with value and fragility, a hand-in point, a round timer. |
 | **Proximity voice** | The REPO social magic | Easiest after Steam (Steam Voice). |
 | **Combat polish** | Fighting feels good | Acid puddles, flask prediction for the thrower, the evil guy reacting to thrown props, sounds. |

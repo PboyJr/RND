@@ -67,7 +67,7 @@ func _start_client(i: int) -> void:
 		"--log-file", _log_dir().path_join("client_%d.log" % i), "res://tests/smoke_test.tscn", "--",
 		"--role=client", "--index=%d" % i, "--clients=%d" % total, "--late=%d" % int(has_late),
 		"--timeout=%s" % t._arg("timeout", "300")])
-	for key in ["ping", "jitter", "loss"]:
+	for key in ["ping", "jitter", "loss", "steam"]:
 		if t._arg(key, "") != "":
 			args.append("--%s=%s" % [key, t._arg(key, "")])
 	OS.create_process(OS.get_executable_path(), args)
