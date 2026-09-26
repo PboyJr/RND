@@ -1,0 +1,98 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://levels/Level.cs" id="1_level"]
+[ext_resource type="PackedScene" path="res://players/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://enemies/enemy.tscn" id="3_enemy"]
+[ext_resource type="Script" path="res://vfx/Effects.cs" id="4_effects"]
+[ext_resource type="Script" path="res://audio/Ambience.cs" id="5_ambience"]
+[ext_resource type="Script" path="res://maze/ChamberExit.cs" id="6_exit"]
+
+[sub_resource type="Environment" id="Environment_chamber"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.025, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.85, 0.9, 1, 1)
+ambient_light_energy = 0.35
+tonemap_mode = 2
+ssao_enabled = true
+glow_enabled = true
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_chamber"]
+resource_local_to_scene = true
+geometry_parsed_geometry_type = 1
+geometry_collision_mask = 1
+cell_height = 0.05
+agent_height = 2.25
+agent_radius = 0.5
+agent_max_climb = 0.1
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_exit"]
+size = Vector3(3, 3, 3)
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_exit"]
+properties/0/path = NodePath(".:SyncElapsed")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+properties/1/path = NodePath(".:IsComplete")
+properties/1/spawn = true
+properties/1/replication_mode = 2
+properties/2/path = NodePath(".:FinalTime")
+properties/2/spawn = true
+properties/2/replication_mode = 2
+
+[node name="Chamber" type="Node3D"]
+script = ExtResource("1_level")
+PlayerScene = ExtResource("2_player")
+EnemyScene = ExtResource("3_enemy")
+TimedRespawn = false
+EnemyReleaseDelay = 20.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_chamber")
+
+[node name="Navigation" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_chamber")
+
+[node name="Geometry" type="Node3D" parent="Navigation"]
+
+[node name="Lights" type="Node3D" parent="."]
+
+[node name="Exit" type="Area3D" parent="."]
+script = ExtResource("6_exit")
+
+[node name="Shape" type="CollisionShape3D" parent="Exit"]
+shape = SubResource("BoxShape3D_exit")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="Exit"]
+replication_interval = 0.1
+replication_config = SubResource("SceneReplicationConfig_exit")
+
+[node name="Props" type="Node3D" parent="."]
+
+[node name="Players" type="Node3D" parent="."]
+
+[node name="PlayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://players/player.tscn")
+spawn_path = NodePath("../Players")
+
+[node name="Enemies" type="Node3D" parent="."]
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://enemies/enemy.tscn")
+spawn_path = NodePath("../Enemies")
+
+[node name="Projectiles" type="Node3D" parent="."]
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://items/acid_flask_projectile.tscn")
+spawn_path = NodePath("../Projectiles")
+
+[node name="Effects" type="Node3D" parent="."]
+script = ExtResource("4_effects")
+
+[node name="Ambience" type="Node3D" parent="."]
+script = ExtResource("5_ambience")
+
+[node name="EnemySpawnPoints" type="Node3D" parent="."]
+
+[node name="SpawnPoints" type="Node3D" parent="."]

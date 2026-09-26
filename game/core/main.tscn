@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" path="res://maze/chamber_crates.tscn" id="15_crates"]
 [ext_resource type="PackedScene" path="res://maze/chamber_ledge.tscn" id="16_ledge"]
 [ext_resource type="PackedScene" path="res://ui/settings_menu.tscn" id="17_settings"]
+[ext_resource type="PackedScene" path="res://maze/generated_chamber.tscn" id="18_generated"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_outline"]
 render_priority = 0
@@ -61,6 +62,7 @@ spawn_limit = 1
 [node name="Run" type="Node" parent="."]
 script = ExtResource("14_run")
 Chambers = Array[PackedScene]([ExtResource("15_crates"), ExtResource("13_chamber"), ExtResource("16_ledge")])
+GeneratedChamber = ExtResource("18_generated")
 
 [node name="MaskAudio" type="Node" parent="." unique_id=2052791583]
 script = ExtResource("8_mask_audio")

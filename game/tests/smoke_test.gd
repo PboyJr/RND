@@ -64,18 +64,23 @@ class ErrorCatcher extends Logger:
 
 func _ready() -> void:
 	OS.add_logger(_errors)
+	# Headless Godot runs uncapped, so every test process spins a core flat out. With a host and
+	# several clients on one machine they starved each other: a client could go a second without a
+	# frame, so the host didn't hear where it was. Players have v-sync; tests get a cap.
+	Engine.max_fps = 120
 	_role = _arg("role", "scenes")
 	_network = get_node("/root/Network")
 	# A profile of the test's own (never the player's real one), fresh every run.
 	var profile_path := "user://smoke_profile_%s_%s.json" % [_role, _arg("index", "0")]
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(profile_path))
 	get_node("/root/ProfileStore").Path = profile_path
-	var timeout := TIMEOUT if _role in ["scenes", "capture", "audio"] else 300.0
+	var timeout := TIMEOUT if _role in ["scenes", "capture", "audio"] else 600.0
 	get_tree().create_timer(float(_arg("timeout", str(timeout)))).timeout.connect(func(): _fail("timed out"); _finish())
 
 	match _role:
 		"scenes": await _run_scenes()
 		"host", "network", "client": await _run_network()
+		"generator": await _run_offline_generated(range(1, int(_arg("seeds", "10")) + 1) if _arg("seed", "") == "" else [int(_arg("seed", "1"))])
 		"capture": await _run_capture()
 		"audio": _check_audio(_arg("out", OS.get_user_data_dir()), true)
 		_: _fail("unknown role '%s'" % _role)
@@ -122,6 +127,7 @@ func _run_scenes() -> void:
 	await _run_offline_chamber()
 	await _run_offline_chambers()
 	await _run_offline_ambush()
+	await _run_offline_generated([1])
 	await _run_offline_run()
 
 
@@ -524,6 +530,123 @@ func _run_offline_chambers() -> void:
 		await _frames(2)
 
 
+# Generated chambers: for each seed at easy, medium and hard, the room builds; you spawn in the start
+# corridor; the exit is shut; the evil guy can reach you; everything its plan needs is reachable; and
+# following the plan opens the exit. The same seed builds the same room twice.
+func _run_offline_generated(seeds: Array) -> void:
+	_start_main()
+	var run := _main.get_node("Run")
+	var first: Node = run.BuildGenerated(7, 0.8)
+	var again: Node = run.BuildGenerated(7, 0.8)
+	var layout := func(level: Node): return level.get_node("Props").get_children().map(func(p): return [str(p.name), p.position])
+	_check(layout.call(first) == layout.call(again) and first.get_meta("plan") == again.get_meta("plan"), "generated: seed 7 built two different rooms")
+	first.free()
+	again.free()
+	var solved := 0
+	for difficulty in ([0.0, 0.5, 1.0] if _arg("difficulty", "") == "" else [float(_arg("difficulty", "0"))]):
+		for seed in seeds:
+			var level: Node3D = run.BuildGenerated(seed, difficulty)
+			level.EnemyReleaseDelay = 999.0
+			add_child(level)
+			if await _solve_generated(level):
+				solved += 1
+			level.queue_free()
+			await _frames(2)
+	_log("generated: solved %d of %d chambers" % [solved, seeds.size() * 3])
+	_main.queue_free()
+	_main = null
+	await _frames(2)
+
+
+func _solve_generated(level: Node3D) -> bool:
+	var plan: Dictionary = level.get_meta("plan")
+	var name := "generated %d at %.1f %s" % [plan["seed"], plan["difficulty"], plan["pieces"]]
+	var failures := _failures.size()
+	var nav := level.get_node("Navigation") as NavigationRegion3D
+	if not _check(await _wait_until(func(): return nav.navigation_mesh.get_polygon_count() > 0 and level.has_node("Players/1"), 5.0), "%s: no navmesh or player" % name):
+		return false
+	await _seconds(0.8)
+	var player := level.get_node("Players/1") as Node3D
+	var start := player.global_position
+	var exit_floor := (level.get_node("Exit") as Node3D).global_position - Vector3(0, 1.5, 0)
+	var door := level.get_node("Navigation/Geometry/ExitDoor") as Node3D
+	_check(player.is_on_floor() and start.distance_to(exit_floor) > 8.0, "%s: didn't spawn on the floor of the start corridor (%s)" % [name, start])
+	_check(not _can_path(level, start, exit_floor), "%s: the exit is open from the start" % name)
+	for lair in level.get_node("EnemySpawnPoints").get_children():
+		_check(_can_path(level, lair.global_position, start), "%s: the evil guy at %s can't reach the start" % [name, lair.global_position])
+	for prop in level.get_node("Props").get_children():
+		_check(prop.global_position.y > -0.5, "%s: %s fell through the floor" % [name, prop.name])
+
+	if plan.has("closet"):
+		var closet: Dictionary = plan["closet"]
+		var button := level.get_node(closet["button"]) as Node3D
+		player.global_position = button.global_position + Vector3(0, 0.05, 1.0)
+		await _frames(2)
+		button.RequestPress()
+		var case := level.get_node(closet["holds"]) as Node3D
+		var opened := await _wait_until(func(): return _can_path(level, start, case.global_position * Vector3(1, 0, 1)), 4.0)
+		_check(opened, "%s: pressing the closet button didn't let anyone reach the case" % name)
+
+	for entry in plan["plates"]:
+		var plate := level.get_node(entry["plate"]) as Node3D
+		var props: Array = entry["props"]
+		var spots := _plate_spots(level, props)
+		for i in props.size():
+			var prop := level.get_node(props[i]) as RigidBody3D
+			if not plan.has("closet") or props[i] != plan["closet"]["holds"]:
+				_check(_can_path(level, start, prop.global_position * Vector3(1, 0, 1)), "%s: can't walk to %s at %s" % [name, props[i], prop.global_position])
+			prop.global_position = plate.global_position + spots[i]
+			prop.linear_velocity = Vector3.ZERO
+			prop.angular_velocity = Vector3.ZERO
+			prop.rotation = Vector3.ZERO
+		_check(await _wait_until(func(): return plate.Pressed, 3.0), "%s: its props (%s) didn't hold %s down" % [name, props, entry["plate"]])
+
+	if plan.has("ledge"):
+		var ledge: Dictionary = plan["ledge"]
+		var button := level.get_node(ledge["button"]) as Node3D
+		var from: Vector3 = ledge["throw_from"] + Vector3(0, 1.7, 0)
+		_check(_can_path(level, start, ledge["throw_from"]), "%s: can't walk to the spot to throw from" % name)
+		var jar := level.get_node("Props/JarA") as RigidBody3D
+		var target := (button.get_node("HitZone") as Node3D).global_position
+		var hit := false
+		for attempt in 5:
+			var aim := target + (target - from).slide(Vector3.UP).normalized() * 0.25 * attempt
+			jar.global_position = from
+			jar.angular_velocity = Vector3.ZERO
+			jar.linear_velocity = _lob(from, aim, 12.0)
+			hit = await _wait_until(func(): return button.Pressed, 2.0)
+			if hit:
+				break
+		_check(hit, "%s: a jar thrown from %s never hit the ledge button" % [name, ledge["throw_from"]])
+
+	var open := await _wait_until(func(): return door.IsOpen and _can_path(level, start, exit_floor), 4.0)
+	_check(open, "%s: following the plan didn't open the way out (door open %s)" % [name, door.IsOpen])
+	if _failures.size() > failures:
+		var verts: PackedVector3Array = nav.navigation_mesh.get_vertices()
+		var box := AABB(verts[0], Vector3.ZERO) if not verts.is_empty() else AABB()
+		for v in verts:
+			box = box.expand(v)
+		_log("%s: navmesh %d polygons over %s" % [name, nav.navigation_mesh.get_polygon_count(), box])
+		var map := level.get_world_3d().navigation_map
+		_log("  map iteration %d, regions %s, ours %s" % [NavigationServer3D.map_get_iteration_id(map), NavigationServer3D.map_get_regions(map), nav.get_rid()])
+		_log("  start %s (navmesh %s); path to the room's middle: %s" % [start, NavigationServer3D.map_get_closest_point(map, start), NavigationServer3D.map_get_path(map, start, Vector3(0, 0, 0), true)])
+		_log("%s: plan %s" % [name, plan])
+		_log("  props: %s" % [level.get_node("Props").get_children().map(func(p): return "%s %s" % [p.name, p.global_position.snapped(Vector3.ONE * 0.1)])])
+		_log("  plates: %s" % [level.get_children().filter(func(n): return n is Area3D and str(n.name).begins_with("Plate")).map(func(p): return "%s %s pressed %s" % [p.name, p.global_position, p.Pressed])])
+	return _failures.size() == failures
+
+
+# Where each prop goes on its plate: the case and a crate side by side, or crates in a grid.
+func _plate_spots(level: Node, props: Array) -> Array:
+	var cases := props.filter(func(p): return (level.get_node(p) as RigidBody3D).mass > 20.0)
+	if not cases.is_empty():
+		return props.map(func(p): return Vector3(-0.28, 0.55, 0) if p == cases[0] else Vector3(0.52, 0.35, 0))
+	var grid := [Vector3(-0.32, 0.35, -0.32), Vector3(0.32, 0.35, -0.32), Vector3(-0.32, 0.35, 0.32), Vector3(0.32, 0.35, 0.32)]
+	if props.size() > 4:
+		grid = [Vector3(-0.62, 0.35, -0.32), Vector3(0, 0.35, -0.32), Vector3(0.62, 0.35, -0.32), Vector3(-0.62, 0.35, 0.32), Vector3(0, 0.35, 0.32), Vector3(0.62, 0.35, 0.32)]
+	return grid.slice(0, props.size())
+
+
 # The easy chamber: a jar or three crates don't hold the plate, four crates do.
 func _solve_crates(level: Node, exit_floor: Vector3) -> void:
 	var plate := level.get_node("Plate") as Node3D
@@ -671,6 +794,7 @@ func _run_offline_run() -> void:
 	_start_main()
 	var run := _main.get_node("Run")
 	run.Length = 2
+	run.GeneratedShare = 0.0 # hand-built chambers, so the ramp below is predictable
 	run.PauseSeconds = 0.2
 	run.ResultSeconds = 0.5
 	run.Start()
@@ -876,6 +1000,19 @@ func _run_capture() -> void:
 	await _seconds(0.3)
 	await _screenshot(out.path_join("settings.png"))
 	settings_menu.hide()
+
+	# A generated chamber (seed 1 at the top difficulty: a closet and a ledge), from just inside the room.
+	_main.ChangeToGenerated(1, 1.0)
+	var built := await _wait_until(func(): return _level() != null and _level().has_meta("plan") and _players() != null and _players().has_node("1"), 5.0)
+	if _check(built, "capture: the generated chamber never loaded"):
+		await _seconds(1.0)
+		var size: Vector3 = _level().get_meta("plan")["size"]
+		var me := _players().get_node("1") as Node3D
+		me.global_position = Vector3(0, 0.05, size.z / 2.0 - 0.5)
+		me.rotation = Vector3.ZERO
+		me.get_node("Head").rotation = Vector3(-0.15, 0, 0)
+		await _seconds(0.5)
+		await _screenshot(out.path_join("generated.png"))
 	_network.Leave()
 
 

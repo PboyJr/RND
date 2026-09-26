@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using RND.Core;
+using RND.Levels;
 using RND.Players;
 
 namespace RND.Maze;
@@ -24,6 +25,11 @@ public partial class MazeRun : Node
 	[Export] public int Length { get; set; } = 3;
 	[Export] public float PauseSeconds { get; set; } = 4f;   // "test complete" before the next chamber loads
 	[Export] public float ResultSeconds { get; set; } = 8f;  // the result screen before the next run
+
+	// The empty chamber the generator builds rooms in, and how often a chamber is generated rather
+	// than hand-built (0: never, 1: always).
+	[Export] public PackedScene GeneratedChamber { get; set; }
+	[Export(PropertyHint.Range, "0,1,0.05")] public float GeneratedShare { get; set; } = 0.5f;
 
 	[ExportGroup("Pay")]
 	// Per chamber passed, whether or not the run is; the bonus only for passing the whole run.
@@ -128,21 +134,35 @@ public partial class MazeRun : Node
 		}
 	}
 
+	// Each chamber is a hand-built one or, GeneratedShare of the time, one the generator builds at the
+	// same difficulty from a fresh seed (every peer builds it from that seed; see Main).
 	private void NextChamber()
 	{
 		Chamber++;
-		GetParent<Main>().ChangeLevel(PickChamber());
+		float difficulty = RampDifficulty();
+		if (GeneratedChamber != null && GD.Randf() < GeneratedShare)
+			GetParent<Main>().ChangeToGenerated((int)(GD.Randi() & 0x7fffffff), difficulty);
+		else
+			GetParent<Main>().ChangeLevel(PickChamber(difficulty));
 		Broadcast();
 	}
 
-	// Chambers are listed easiest first, and a run climbs the list to its hardest. A stronger party
-	// starts further up. Between two chambers of the list, it picks one at random, leaning to the
-	// nearer, so a longer list gives varied runs.
-	private PackedScene PickChamber()
+	/// <summary>Every peer (the level spawner calls it): builds the generated chamber for this seed.</summary>
+	public Level BuildGenerated(int seed, float difficulty) => ChamberGenerator.Build(GeneratedChamber, seed, difficulty);
+
+	// A run climbs from easy (0) to hard (1). A stronger party starts further up.
+	private float RampDifficulty()
+	{
+		float start = Mathf.Clamp((PartyLevel - 1f) / (FullStartLevel - 1f), 0f, 1f) * MaxStartFraction;
+		return Length <= 1 ? start : start + Chamber * (1f - start) / (Length - 1);
+	}
+
+	// The hand-built chambers are listed easiest first. Between two of them it picks one at random,
+	// leaning to the nearer, so a longer list gives varied runs.
+	private PackedScene PickChamber(float difficulty)
 	{
 		int last = Chambers.Count - 1;
-		float start = Mathf.Clamp((PartyLevel - 1f) / (FullStartLevel - 1f), 0f, 1f) * MaxStartFraction * last;
-		float step = Length <= 1 ? start : start + Chamber * (last - start) / (Length - 1);
+		float step = difficulty * last;
 		int index = Mathf.FloorToInt(step) + (GD.Randf() < step - Mathf.Floor(step) ? 1 : 0);
 		return Chambers[Mathf.Clamp(index, 0, last)];
 	}

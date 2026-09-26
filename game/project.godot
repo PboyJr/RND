@@ -129,6 +129,8 @@ hotbar_5={
 [navigation]
 
 3d/default_cell_height=0.05
+world/map_use_async_iterations=false
+world/region_use_async_iterations=false
 
 [physics]
 

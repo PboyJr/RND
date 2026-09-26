@@ -136,7 +136,7 @@ through the chambers under pressure → pass or fail → reward → go again.
   - [x] Smoke test: every chamber spawns you, the evil guy can reach the start, the exit is shut;
         Crates and Ledge are solved in the test (Ledge with a real-speed jar throw)
   - [ ] Playtest the new chambers (is the ledge button easy enough to spot and hit?)
-  - [ ] More chambers per difficulty, so runs vary
+  - [x] More chambers per difficulty, so runs vary (generated chambers, half of each run)
   - [x] Starting difficulty from the party's level (0.7 × average + 0.3 × highest, clamped by the host)
 - [ ] Between runs: somewhere to spend the reward (upgrades / research tree), instead of an
       automatic restart
@@ -152,11 +152,16 @@ The team asked for "all of it": the hurdles we hadn't tackled yet, worked throug
        (after the branch is pushed) and a local export (needs the ~1 GB export templates)
 3. [x] **Rewards and saving:** a run pays money and XP into each player's own profile (saved safely, levels up); the party's level sets the starting difficulty. *Still to do:* something to spend money on
 4. [x] **Enemy AI v3:** the pack converges on a spotter's growl, waits at shut doors (and comes
-       through when they open), learns where players keep getting away. *Still to do:* a level
-       with two or more evil guys, so the pack shows up in play
-5. [ ] **Chamber modules and a maze generator:** rooms with doorway connectors and difficulty tags,
-       stitched into a maze the generator checks is solvable
-6. [ ] **Steam lobbies and relay:** friends over the internet (needs a two-account playtest at the end)
+       through when they open), learns where players keep getting away. The hardest generated
+       chambers release two evil guys, so the pack forms
+5. [x] **Generated chambers:** a seeded generator builds chambers from the puzzle pieces (plates,
+       closet, ledge button, second plate, heavier plate, a second evil guy) to a difficulty budget;
+       every peer builds the same room from the seed. Half of a run's chambers are generated. 90 of 90
+       swept chambers solve from their plan. (Found and fixed: async navigation map updates dropping a
+       new level's navmesh.)
+6. [ ] **Steam lobbies and relay:** friends over the internet. *Planned* (see DECISIONS → Steam plan):
+       Facepunch.Steamworks, a Steam peer in `core/`, friends-only lobbies with overlay invites.
+       *Waiting on:* the team's OK to add the package, then a two-computer playtest
 
 ### M9: Network hardening ✅ (2026-09-25)
 
@@ -180,14 +185,16 @@ and leaving.
 
 ---
 
-## Next: pick one
+## Next: pick one (after the big push)
 
 | Option | What it proves | Notes |
 | --- | --- | --- |
-| **Valuables + round loop** ⭐ recommended | It's a *game*, not a tech demo | Research props with value and fragility (damage loses value), extraction / hand-in point, round timer, end-of-round reward (what it pays in is `Open`). Works entirely on the current LAN setup. Now there's a threat to survive while doing it. |
-| **Combat polish** | Fighting feels good | Acid puddles, flask prediction for the thrower, enemy reacts to thrown props, better death (revive?), sounds. |
-| **Steam lobbies + relay** | Friends can play over the internet | Choose Facepunch.Steamworks or GodotSteam. Swap goes in `core/Network.cs`. Needed before any remote playtest. |
+| **Playtest what's there** ⭐ | Whether it's fun | Nothing in the big push has been played by a person: the chambers (can you spot and hit the ledge button?), generated rooms, the pack of evil guys, carrying online. Cheap, and it should steer everything below. |
+| **Somewhere to spend the pay** | The loop closes: runs → money → upgrades → better runs | The between-run hub / research tree (DESIGN: Factorio-style). Needs the team to decide what the upgrades are. |
+| **Steam lobbies + relay** | Friends can play over the internet | Planned (DECISIONS → Steam plan); waiting on the OK to add the package. Needed before any remote playtest. |
+| **Valuables + retrieval round** | The second mode, the one most like REPO | Research props with value and fragility, a hand-in point, a round timer. |
 | **Proximity voice** | The REPO social magic | Easiest after Steam (Steam Voice). |
+| **Combat polish** | Fighting feels good | Acid puddles, flask prediction for the thrower, the evil guy reacting to thrown props, sounds. |
 
 ---
 

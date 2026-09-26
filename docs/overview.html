@@ -146,8 +146,8 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 			<li><strong>A version anyone can download and run.</strong> <em>Done, almost.</em> Every change to the game now gets tested and turned into a Windows download automatically. The first automatic build happens once this work is uploaded. There's also a <strong>settings menu</strong> (in the main menu and on <kbd>Esc</kbd>): mouse sensitivity, field of view, three volume sliders, fullscreen, v-sync, and a 3D resolution slider for weaker computers.</li>
 			<li><strong>Rewards.</strong> <em>Done.</em> A maze run now pays money and experience: <span class="num">100</span> money and <span class="num">50</span> XP per chamber you get through (even if the run then fails), plus a bonus of <span class="num">200</span> and <span class="num">100</span> for finishing it. XP levels you up. It's saved on your computer, and the main menu shows your level, money and number of runs. A stronger team also starts its runs further up the difficulty ladder. Nothing to spend the money on yet.</li>
 			<li><strong>A smarter evil guy.</strong> <em>Done.</em> When it spots you it growls, and any other evil guy that hears it comes straight for you (and when it loses you, it tells them where you went). If you hide behind a shut door it waits by the door and comes in the moment it opens. And it learns: wherever players keep getting away, it starts checking.</li>
-			<li><strong>Mazes put together from rooms</strong>, so no two runs are the same. <em>Next.</em></li>
-			<li><strong>Steam:</strong> play with friends over the internet.</li>
+			<li><strong>Rooms made fresh every run.</strong> <em>Done.</em> Half the chambers in a run are now built on the spot from the puzzle pieces we have (plates, crates, the case in a closet, a button up on a ledge, a second plate, and on the hardest ones two evil guys). The harder the chamber, the more pieces. Every player's game builds the exact same room, and the tests check that every such room can actually be solved.</li>
+			<li><strong>Steam:</strong> play with friends over the internet. <em>Planned, waiting on a yes from the team</em> to add the Steam library, and it needs two computers with two Steam accounts to test.</li>
 		</ol>
 		<p><strong>Also still to do:</strong> playtest the three test chambers (can you spot the ledge button, and hit it?).</p>
 	</div>
@@ -201,7 +201,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li><strong>Starting difficulty</strong> leans toward the strongest player, so a strong player can't be carried and nobody can game it with low-level friends. <span class="pill leaning">Leaning</span></li>
 		<li><strong>No portal gun</strong> for now. <span class="pill leaning">Leaning</span></li>
 		<li><strong>The evil guy is let loose</strong> 20 seconds into every chamber, with a growl everyone hears. A shut door stops him; an open one doesn't. <em>Built.</em></li>
-		<li><strong>A run is three chambers,</strong> easiest first. <em>Built,</em> with three chambers so far.</li>
+		<li><strong>A run is three chambers,</strong> easiest first. <em>Built:</em> three hand-made chambers, plus fresh generated ones (half of each run).</li>
 	</ul>
 </section>
 
@@ -317,13 +317,15 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <section id="next">
 	<h2>What we're deciding next</h2>
-	<p>The maze run comes first (see <a href="#now">Working on now</a>). After that, pick one:</p>
+	<p>The big push is nearly done (see <a href="#now">Working on now</a>). After it, pick one:</p>
 	<div class="table"><table>
 		<tr><th>Option</th><th>What it gets us</th></tr>
-		<tr><td>Loot + round loop ★</td><td>Recommended. Turns the tech demo into a game: loot with value that loses money when it breaks, an extraction point, a timer and a payout.</td></tr>
-		<tr><td>Combat polish</td><td>Fighting feels good: acid puddles, the creature reacting to thrown things, better death.</td></tr>
-		<tr><td>Steam + online play</td><td>Friends can play over the internet. Needed before any remote playtest.</td></tr>
+		<tr><td>Playtest ★</td><td>Recommended. Nobody has played any of the new stuff yet: the chambers, the generated rooms, the evil guys calling each other, carrying on a laggy connection. Tells us what to do next.</td></tr>
+		<tr><td>Somewhere to spend money</td><td>The between-run hub and research tree, so runs lead somewhere. Needs us to decide what the upgrades are.</td></tr>
+		<tr><td>Steam + online play</td><td>Friends can play over the internet. Planned; needs a yes.</td></tr>
+		<tr><td>Loot + round loop</td><td>The R.E.P.O.-style mode: loot that loses value when it breaks, an extraction point, a timer and a payout.</td></tr>
 		<tr><td>Voice chat by distance</td><td>The R.E.P.O. social magic. Easiest after Steam.</td></tr>
+		<tr><td>Combat polish</td><td>Fighting feels good: acid puddles, the creature reacting to thrown things, better death.</td></tr>
 	</table></div>
 </section>
 
@@ -376,7 +378,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li>Only one creature type, and only one per level, so the pack behaviour never shows up yet. It can drop down ledges but can't jump up.</li>
 		<li>Sounds are placeholders, tuned by numbers rather than by ear.</li>
 		<li>Money from maze runs has nothing to be spent on yet, and after the result screen a new run starts on its own.</li>
-		<li>Every run plays the same three chambers in the same order, and the two new ones haven't been playtested.</li>
+		<li>The hand-made and generated chambers haven't been playtested yet, and generated rooms all use the same few pieces.</li>
 		<li>The chamber's plates, buttons and doors don't have their own sounds yet.</li>
 		<li>You walk straight through your teammates. That's deliberate (see the table above).</li>
 		<li>Grabbing something takes a moment on a laggy connection, because the host has to agree you got it first.</li>

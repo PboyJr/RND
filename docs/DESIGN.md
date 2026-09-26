@@ -201,6 +201,13 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
 - **Layout: REPO-style stitched rooms** (`Leaning`). Chambers are hand-built rooms with doorway
   connectors, and each round stitches a set of them together into a maze. Every room is tagged
   with a difficulty, and the generator picks from the pool.
+  - **In the prototype** (2026-09-25): chambers stay separate rooms with a "lift" between them,
+    and **half of a run's chambers are generated** instead of hand-built. The generator makes a
+    fresh room each time from the pieces above, spending a difficulty budget: an easy one is a
+    plate and some crates; a hard one might hide the case in a closet, want a jar lobbed onto a
+    ledge button, need two plates held at once, and release two evil guys early. Every generated
+    chamber is checked solvable in the tests. `Open`: keep a mix, or go all-generated once there are
+    more kinds of piece? More pieces to add: sound locks, acid-melted panels, co-op holds.
 - **Difficulty ramps through the round** (`Leaning`): the further in you get, the more rooms and
   the harder the rooms. **In the prototype** (2026-09-25): three chambers, and a 3-chamber run
   plays them easiest to hardest:

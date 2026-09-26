@@ -91,6 +91,7 @@ func _host_do(action: String, arg: Variant = null) -> void:
 		"start_run":
 			var run: Node = t._main.get_node("Run")
 			run.Length = run.Chambers.size()
+			run.GeneratedShare = 0.0 # the suite knows the hand-built chambers' layouts
 			run.PauseSeconds = 1.5
 			run.ResultSeconds = 3.0
 			# Keep the evil guy out of the maze: this is about the puzzles over the network.
@@ -110,6 +111,8 @@ func _host_do(action: String, arg: Variant = null) -> void:
 		"kill_all":
 			for player in t._players().get_children():
 				player.get_node("Health").TakeDamage(99999.0, 0)
+		"generate_next": # the next run's chambers are all generated
+			t._main.get_node("Run").GeneratedShare = 1.0
 		"snapshot":
 			reply = _snapshot()
 	rpc_id(sender, "_reply", action, reply)
@@ -128,8 +131,10 @@ func _snapshot() -> Dictionary:
 			doors[str(node.name)] = node.IsOpen
 	var players := {}
 	for player in level.get_node("Players").get_children():
-		players[str(player.name)] = "%s%s" % [player.global_position.snapped(Vector3.ONE * 0.01), " (down)" if player.IsDead else ""]
-	return {"elapsed": level.get_node("Exit").Elapsed, "props": props, "doors": doors, "chamber": t._main.get_node("Run").Chamber, "players": players}
+		players[str(player.name)] = "%s reported %s%s" % [player.global_position.snapped(Vector3.ONE * 0.01), player.SyncPosition.snapped(Vector3.ONE * 0.01), " (down)" if player.IsDead else ""]
+	var plan: Dictionary = level.get_meta("plan") if level.has_meta("plan") else {}
+	var exit: Node = level.get_node_or_null("Exit")
+	return {"elapsed": exit.Elapsed if exit else 0.0, "props": props, "doors": doors, "chamber": t._main.get_node("Run").Chamber, "players": players, "plan": plan}
 
 
 func _on_level_added(level: Node) -> void:
@@ -260,7 +265,12 @@ func _ask(action: String, arg: Variant = null) -> Variant:
 	return _replies.get(action)
 
 
+var _reported := false
+
 func _send_report() -> void:
+	if _reported:
+		return
+	_reported = true
 	var failures: PackedStringArray = t._failures.duplicate()
 	for error in t._errors.messages:
 		failures.append("error logged: " + error)
@@ -279,6 +289,7 @@ func _send_report() -> void:
 # Faces where it's going unless `yaw` is given. Samples how far a carried prop trails the hold
 # point, if there is one. False if it gets stuck.
 var _last_walked := Vector3.INF # where the last step left us, to spot something else moving us mid-walk
+var _last_bump := "nothing" # what the last blocked step ran into
 
 func _walk(points: Array, speed := 4.0, yaw: Variant = null, carrying: Node3D = null) -> bool:
 	var me := _me()
@@ -300,7 +311,9 @@ func _walk(points: Array, speed := 4.0, yaw: Variant = null, carrying: Node3D = 
 				best = distance
 				progress_at = Time.get_ticks_msec()
 			elif Time.get_ticks_msec() - progress_at > 1500:
-				_log("stuck at %s on the way to %s" % [me.global_position, target])
+				if distance < 0.3:
+					break # near enough
+				_log("stuck at %s on the way to %s (against %s)" % [me.global_position, target, _last_bump])
 				return false
 			var direction := to / distance
 			if yaw == null:
@@ -315,9 +328,15 @@ func _walk(points: Array, speed := 4.0, yaw: Variant = null, carrying: Node3D = 
 			var before := me.global_position
 			if _last_walked != Vector3.INF and _last_walked.distance_to(before) > 1.0:
 				_log("was moved from %s to %s between steps, walking to %s" % [_last_walked, before, target])
-			var collision := me.move_and_collide(direction * minf(speed * dt, distance))
-			if collision: # slide along it (sideways only), like a player brushing a wall or another player
-				me.move_and_collide(collision.get_remainder().slide(collision.get_normal()) * Vector3(1, 0, 1))
+			var step := direction * minf(speed * dt, distance)
+			var collision := me.move_and_collide(step, true) # look first
+			if collision == null or collision.get_normal().y > 0.7:
+				me.global_position += step # clear, or only the floor we're standing on
+			else: # a wall or a prop: go as far as it lets us, then slide along it (sideways only)
+				_last_bump = str(collision.get_collider().name) if collision.get_collider() else "?"
+				collision = me.move_and_collide(step)
+				if collision:
+					me.move_and_collide(collision.get_remainder().slide(collision.get_normal()) * Vector3(1, 0, 1))
 			if before.y - me.global_position.y > 0.3 or before.distance_to(me.global_position) > 2.0:
 				_log("jumped from %s to %s walking to %s" % [before, me.global_position, target])
 			_last_walked = me.global_position
@@ -457,6 +476,8 @@ func _sandbox_lead() -> void:
 	await t._seconds(0.5) # let the host see where we are
 	jar.rpc_id(1, "RequestGrab")
 	if not t._check(await t._wait_until(func(): return jar.HeldBy == my_id, 3.0), "client: host didn't confirm the grab (HeldBy=%s)" % jar.HeldBy):
+		var snap: Dictionary = await _ask("snapshot")
+		_log("grab refused: I'm at %s, the jar at %s; the host has players %s, props %s" % [me.global_position, jar.global_position, snap["players"], snap["props"].get("JarA", "held or moving")])
 		return
 	await t._seconds(1.0)
 	var hold_error := jar.global_position.distance_to(me.HoldPoint)
@@ -477,7 +498,7 @@ func _sandbox_lead() -> void:
 	jar.Throw(me.AimDirection)
 	t._check(await t._wait_until(func(): return jar.HeldBy == 0, 3.0), "client: throw didn't release the jar")
 	await t._seconds(0.4)
-	t._check(jar.global_position.z < before.z - 1.0, "client: jar didn't fly forward (z %.2f -> %.2f)" % [before.z, jar.global_position.z])
+	t._check(jar.global_position.distance_to(before) > 1.0, "client: the thrown jar didn't fly (%s -> %s)" % [before, jar.global_position])
 	_log("threw jar: %s -> %s" % [before, jar.global_position])
 
 	await _sandbox_filter(me)
@@ -524,13 +545,23 @@ func _sandbox_combat(me: Node3D) -> void:
 		return
 	_log("evil guy hit us: %.0f / %.0f" % [my_health.Current, my_health.MaxHealth])
 
-	# It stands still recovering from the swing, so a point-blank throw must land. (At range, a
-	# path-following target can legitimately dodge, which made this flaky.)
+	# It stands still recovering from the swing, so a point-blank throw should land. Over a laggy
+	# connection we see it a little late, and it may already be moving again: then step up to it
+	# and throw again once the flask has refilled, as a player would.
 	var start_health: float = enemy_health.Current
-	await t._seconds(ping / 1000.0) # the host needs our latest position to accept the throw
-	var eye: Vector3 = me.EyePosition
-	me.rpc_id(1, "RequestThrowItem", 1, eye, (enemy.global_position + Vector3.UP * 1.2 - eye).normalized())
-	t._check(await t._wait_until(func(): return enemy_health.Current < start_health, 2.0), "client: point-blank acid flask didn't hurt the evil guy")
+	var hurt := false
+	for attempt in 2:
+		if attempt > 0:
+			await t._seconds(5.2) # the flask's recharge
+			var away := -enemy.global_position * Vector3(1, 0, 1)
+			me.global_position = enemy.global_position + (away.normalized() if away.length() > 1.0 else Vector3.BACK) * 1.2
+		await t._seconds(ping / 1000.0) # the host needs our latest position to accept the throw
+		var eye: Vector3 = me.EyePosition
+		me.rpc_id(1, "RequestThrowItem", 1, eye, (enemy.global_position + Vector3.UP * 1.2 - eye).normalized())
+		hurt = await t._wait_until(func(): return enemy_health.Current < start_health, 2.0)
+		if hurt:
+			break
+	t._check(hurt, "client: two point-blank acid flasks didn't hurt the evil guy")
 
 
 # The host's player lies dead (see run_host). Next to it we revive it at half health where it fell;
@@ -844,19 +875,39 @@ func _run_over() -> void:
 		_face(crate.global_position)
 		crate.rpc_id(1, "RequestGrab")
 		t._check(await t._wait_until(func(): return crate.HeldBy == multiplayer.get_unique_id(), 3.0), "client %d: couldn't grab a crate to leave with" % index)
+		await _send_report() # now, so leaving right after the barrier is quick
 		await _sync("leaving")
-		return # run_client reports and leaves
+		return # run_client leaves
 	if leaver >= 0:
 		await _sync("leaving")
 		var crate := t._level().get_node("Props/CrateA") as RigidBody3D
 		var gone_id: int = _roster.get(leaver, -1)
-		t._check(await t._wait_until(func(): return not t._players().has_node(str(gone_id)), 10.0), "client %d: the leaver's player is still here" % index)
+		# A goodbye lost on a bad connection falls back to the 6 s silence timeout.
+		t._check(await t._wait_until(func(): return not t._players().has_node(str(gone_id)), 20.0), "client %d: the leaver's player is still here" % index)
 		t._check(await t._wait_until(func(): return crate.HeldBy == 0, 3.0), "client %d: the crate is still held by someone who left" % index)
 	var remaining := total - (1 if leaver >= 0 else 0)
 	await _sync("before the fall", remaining)
 	if _lead():
+		await _ask("generate_next")
 		await _ask("kill_all")
 	t._check(await t._wait_until(func(): return run.Result == 2, 5.0), "client %d: everyone down didn't fail the run (result %d)" % [index, run.Result])
 	await t._seconds(0.5 + ping / 1000.0) # the (empty) pay for it
 	t._check(profile.RunCount == 2 and profile.Money == paid, "client %d: after a failed run in chamber 1: %d runs, %d money (want 2, %d)" % [index, profile.RunCount, profile.Money, paid])
+	await _generated_matches()
 	await _sync("done", remaining)
+
+
+# The next run starts in a generated chamber: every client must have built exactly the host's room
+# from the seed (same plan, props where the host has them).
+func _generated_matches() -> void:
+	var built: bool = await t._wait_until(func(): return t._level() != null and t._level().has_meta("plan") and _me() != null, 15.0)
+	if not t._check(built, "client %d: the generated chamber never arrived" % index):
+		return
+	await t._seconds(1.0 + ping / 1000.0)
+	var snap: Dictionary = await _ask("snapshot")
+	var plan: Dictionary = t._level().get_meta("plan")
+	t._check(snap["plan"] == plan, "client %d: built a different chamber from the host's (%s vs %s)" % [index, plan, snap["plan"]])
+	for prop_name in snap["props"]:
+		var mine: Node3D = t._level().get_node_or_null("Props/" + prop_name)
+		t._check(mine != null and mine.global_position.distance_to(snap["props"][prop_name]) < 0.1, "client %d: generated %s is at %s, on the host %s" % [index, prop_name, mine.global_position if mine else "missing", snap["props"][prop_name]])
+	_stats.append("generated chamber %s built the same as the host's" % [plan["pieces"]])

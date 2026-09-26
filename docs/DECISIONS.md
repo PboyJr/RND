@@ -96,6 +96,7 @@ the level spawned by the host avoids that race.
   addon over our own connection.
 - **Our own backend:** probably needed eventually, for (a) persistent characters that can't be
   edited locally (the decay system) and (b) relaying phone players, who can't use Steam.
+- (2026-09-25: Steam now has a plan, see "Steam plan" below.)
 
 ## 2026-09-24: Look: grain post-process layer (*Superseded* by "Gas mask visor" below)
 
@@ -643,6 +644,11 @@ played over the network at all. This found nine real bugs in its first day (the 
 **Passing configurations:** 1 client with no lag; 3 clients at 150 ms / 20 ms jitter / 2% loss; 4
 clients at 250 ms / 40 ms jitter / 5% loss.
 
+**Gotcha:** test processes cap themselves at 120 fps (`Engine.max_fps` in `smoke_test.gd`).
+Headless Godot runs uncapped, so a host and four clients on one machine each spun a core flat out
+and starved each other: a client could go a second without a frame, so the host didn't know where
+it was and refused its first grab. That looked exactly like a network bug. Players have v-sync.
+
 ## 2026-09-25: Player state goes through the host; clients never talk to each other
 
 **Decision:**
@@ -831,6 +837,77 @@ design's distraction play), which a noise that told it who threw it would spoil.
 got away twice is the first place it patrols; in the closet chamber it waits by the shut door for 7 s
 after hearing a noise inside, and comes in when the door opens.
 
+## 2026-09-25: Generated chambers, built from a seed on every peer
+
+**Decision:**
+- `maze/ChamberGenerator.cs` builds a chamber from a seed and a difficulty (0–1) into
+  `maze/generated_chamber.tscn`, an empty chamber (spawners, exit, effects, no room). A room is
+  12–16 m square with a start and an exit corridor; the puzzle is bought from a difficulty budget
+  (1 + 3 × difficulty points): a plate always (weighed down by 4 crates or the case), then a closet
+  holding the case behind a button door (1.5), a ledge button only a thrown jar can press (1.5), a
+  second plate (1), a heavier plate needing case + crate (0.5), and above 0.75 a second evil guy
+  (1). The evil guy's release comes sooner the harder it is (28 s → 12 s). Pieces go on a 1 m grid
+  that keeps the walk from start to exit, both doorways and the closet's mouth clear.
+- The room is built from **plain boxes** (static bodies with box meshes), not CSG: the navmesh
+  bake reads them at once, whereas CSG made in code only builds its geometry later.
+- The generator leaves a **plan** on the level (meta `plan`: seed, difficulty, size, pieces, each
+  plate and the props that weigh it down, the closet's button and what it holds, the ledge button
+  and a spot to throw from). The smoke test solves chambers from it.
+- **Networking:** the host's `MazeRun` picks `GeneratedShare` of chambers (0.5) as generated, with a
+  fresh seed and the run's difficulty at that point; `Main.ChangeToGenerated` spawns
+  `[seed, difficulty]` through the level spawner, whose spawn function builds the room on every peer
+  (late joiners too). Same seed, same names and places, so everything replicates as in a
+  hand-built chamber.
+
+**Why:** a run was the same three rooms in the same order. The design's "chambers assembled from
+modules" is the scalable answer to content, and "intelligent and dynamic" applies to rooms too.
+Chambers stay separate levels (a lift between tests) rather than stitched into one.
+
+**How we verified it:** the offline smoke test builds seed 7 twice (the same room), then builds
+and solves one chamber at each of three difficulties. `--role=generator --seeds=N` sweeps more:
+each chamber must spawn you in the start corridor with the exit shut, let the evil guy reach you,
+keep every prop it needs reachable, and open when its plan is followed (closet button, props onto
+plates, a real-speed jar lob at the ledge button). 90 of 90 passed (30 seeds). The network test
+makes the run after the failed one generated and checks every client built the host's room.
+
+## 2026-09-25: Navigation maps update synchronously
+
+**Decision:** `navigation/world/map_use_async_iterations = false` and
+`navigation/world/region_use_async_iterations = false` in `project.godot`.
+
+**Why:** with Godot's asynchronous map updates, a navmesh change that arrives while the map is
+still rebuilding (a new level's bake finishing right after the level itself was added) can be
+dropped: the map then has **no polygons** for that level, and nothing can path. The generator sweep
+found it (every chamber after the first failed; alone, each passed; forcing a map update fixed it;
+the map setting alone still missed one in the longer offline suite, so regions update in step too).
+It can happen on any level change, so it's the likely cause of "the evil guy saw you but never left
+his spawn" (noted earlier as stale editor state). Our maps are small, so updating them in step
+costs nothing noticeable.
+
+## 2026-09-25: Steam plan (`Leaning`, waiting on the team's OK to add the package)
+
+**Recommendation:** **Facepunch.Steamworks** (MIT, C#, one NuGet package that includes
+`steam_api64.dll`) over GodotSteam (a C++ engine extension; from C# it's reached through untyped
+calls or community bindings, and it's a per-platform binary to keep in step with the editor).
+The plan, all inside `core/` so gameplay code doesn't change:
+- `core/SteamPeer.cs`: a `MultiplayerPeerExtension` over Steam's networking sockets (Valve's relay,
+  so no port forwarding or NAT trouble). Peer ids come from Steam ids (a 31-bit hash; the host is
+  1). Godot's reliable / unreliable modes map to Steam's send flags.
+- `Network.cs`: `HostSteam()` creates a friends-only Steam lobby and opens a listen socket;
+  `JoinSteam(lobby)` connects to the lobby owner. Accepting an invite (Steam overlay) or joining
+  from the friends list calls it. The main menu gets "Host on Steam" / "Invite friends"; the IP
+  box stays for LAN.
+- Development uses Steam's test app id **480** (`steam_appid.txt` next to the project, not
+  shipped). A real app id needs the $100 Steam Direct fee.
+- One thing to change first: our level-change handshake relies on ENet keeping a channel's
+  reliable and unreliable messages in order. Steam doesn't promise that across the two, so the
+  player state reports should carry the level they belong to (the host drops stale ones).
+- **Testing needs two computers with two Steam accounts** (Steam allows one account per machine),
+  so the last step is a playtest by the team. The network smoke test keeps running on ENet.
+
+**Blocked on:** permission to download the package from nuget.org (about 3 MB), and confirming
+app id 480 for now.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -883,8 +960,9 @@ Things the prototype does on purpose that we'll need to revisit:
 - Cracks only clear when health is back to full (respawn). Partial healing, if it's ever added,
   should mend some cracks.
 - Rebuilding the C# code or reimporting assets from the command line while the Godot editor is
-  open can leave the editor running stale state (seen 2026-09-25: the evil guy saw you but never
-  left his spawn). Close Godot fully and reopen the project.
+  open can leave the editor running stale state. (The "evil guy never left his spawn" seen on
+  2026-09-25 was most likely the async navigation map bug; see "Navigation maps update
+  synchronously".) Close Godot fully and reopen the project if things act strangely.
 - The evil guy walking through an open door is only checked as "a path exists", not by watching
   him walk it (drop links work the same way and he walks those).
 - Doors and buttons have no sounds of their own (both reuse `Impact`), no ticking while a button

@@ -157,6 +157,10 @@ It logs what players would feel (how far carried props trail, grab delay, traffi
 to `--out=<folder>`. To run a host and a client by hand instead: `--role=host`, then `--role=client`
 in a second terminal.
 
+Generated chambers have a sweep of their own: `--role=generator --seeds=30` builds 30 seeds at
+easy, medium and hard (90 chambers) and solves each one from its plan (`--seed=` and `--difficulty=`
+for a single one).
+
 Each prints `SMOKE PASS` or `SMOKE FAIL: ...` and exits 0 / 1.
 
 Shaders can't render headless, so the visor has a **visual check** instead. It opens a window for

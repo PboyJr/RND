@@ -53,6 +53,8 @@ section says what's in progress: update it whenever the current task starts, cha
 - Player settings: a property on `core/Settings.cs` (load / save / `Apply`) plus a line in the
   table in `ui/SettingsMenu.cs`. CI (`.github/workflows/build.yml`) runs both smoke tests and
   exports the Windows build on every push; keep `export_presets.cfg`'s preset named "Windows".
+- Generated chambers (`maze/ChamberGenerator.cs`): after changing the generator (or a piece it uses),
+  run the smoke test's `generator` role (`--seeds=30`): every chamber must still solve from its plan.
 - Materials: author ordinary `StandardMaterial3D`s. `vfx/ToonStyle.cs` turns opaque ones into the
   cel-shaded look at runtime (F2 toggles it; the F2–F7 debug switches (look, plus F7 sound) are one table in `ui/Hud.cs`),
   and animating the original's albedo or emission still works. Liquids: a closed `Liquid` mesh + `vfx/Liquid.cs` + `vfx/liquid.gdshader`. A model used
