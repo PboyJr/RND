@@ -119,7 +119,10 @@ public partial class Hud : Control
 		_deathLabel.Visible = local.IsDead || run is { Active: true, Result: not RunResult.None };
 		if (run is { Active: true, Result: not RunResult.None })
 			_deathLabel.Text = (run.Result == RunResult.Passed ? "RUN COMPLETE" : "ALL SUBJECTS DOWN")
-				+ $"\nTests passed: {run.Chamber + (run.Result == RunResult.Passed ? 1 : 0)} of {run.Length}\nNext run starting…";
+				+ $"\nTests passed: {run.Chamber + (run.Result == RunResult.Passed ? 1 : 0)} of {run.Length}"
+				+ $"\n+{run.LastPay.Money} money   +{run.LastPay.Xp} XP"
+				+ (run.LastPay.Levels > 0 ? $"   LEVEL {ProfileStore.Instance?.Level}!" : "")
+				+ "\nNext run starting…";
 		else if (local.IsDead && Level.Current is { TimedRespawn: false })
 			_deathLabel.Text = "You're down.\nA teammate can revive you (hold E).";
 		else if (local.IsDead)

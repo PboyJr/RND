@@ -124,7 +124,7 @@ through the chambers under pressure → pass or fail → reward → go again.
       on you for 3 s (back at 50 health, where you fell). **Everyone down at once fails the run**
 - [x] **The evil guy in chambers:** released 20 s into each chamber with a growl the whole room
       hears. Shut doors are walls to his pathfinding; open ones he walks through
-- [ ] **Rewards:** the run pays out (money / XP) into the local profile (`user://profile.json`,
+- [x] **Rewards:** the run pays out (money / XP) into the local profile (`user://profile.json`,
       see DESIGN → How player data is stored), and `RunCount` goes up at run start
 - [ ] **More chambers** (content), so a run isn't the same room three times, then the difficulty
       ramp and the party-level starting difficulty (**in progress**, started 2026-09-25)
@@ -137,7 +137,7 @@ through the chambers under pressure → pass or fail → reward → go again.
         Crates and Ledge are solved in the test (Ledge with a real-speed jar throw)
   - [ ] Playtest the new chambers (is the ledge button easy enough to spot and hit?)
   - [ ] More chambers per difficulty, so runs vary
-  - [ ] Starting difficulty from the party's level (needs player levels first)
+  - [x] Starting difficulty from the party's level (0.7 × average + 0.3 × highest, clamped by the host)
 - [ ] Between runs: somewhere to spend the reward (upgrades / research tree), instead of an
       automatic restart
 
@@ -150,7 +150,7 @@ The team asked for "all of it": the hurdles we hadn't tackled yet, worked throug
        build to download on every push), settings menu (sensitivity, field of view, three
        volumes, fullscreen, v-sync, 3D resolution) saved to disk. *Still to see:* the first CI run
        (after the branch is pushed) and a local export (needs the ~1 GB export templates)
-3. [ ] **Rewards and saving:** the run pays out into the local profile (M8's next item)
+3. [x] **Rewards and saving:** a run pays money and XP into each player's own profile (saved safely, levels up); the party's level sets the starting difficulty. *Still to do:* something to spend money on
 4. [ ] **Enemy AI v3:** noises carry who made them, waiting at shut doors or finding another way,
        several enemies sharing what they notice
 5. [ ] **Chamber modules and a maze generator:** rooms with doorway connectors and difficulty tags,

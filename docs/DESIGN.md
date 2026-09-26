@@ -222,6 +222,17 @@ Each chamber is a physics puzzle: get the team from the entry door to the exit d
   - Lore fit: the experimenters calibrate the test to the subjects they were given.
   - `Open`: what "level" is (character level, rebirths, upgrades owned?), and whether it's
     recomputed when someone joins mid-round.
+  - **In the prototype** (2026-09-25): "level" is the character's level. Level 1 starts a run at
+    the easiest chamber; a party at level 20 or more starts halfway up the list. Runs always end at
+    the hardest. It's worked out when a run starts, so someone joining mid-run doesn't change it.
+- **What a run pays** (`Leaning`, numbers to tune, 2026-09-25): **100 money and 50 XP for every
+  chamber passed**, even if the run then fails, **plus 200 money and 100 XP for passing the whole
+  run**. Everyone in the run gets the same (late joiners too). XP levels your character up (each
+  level takes 100 × its number in XP: 100 to reach level 2, 200 more for level 3). Money goes to
+  the scientist (the profile), not the rat, so every character shares it. The result screen shows
+  what you earned; nothing spends it yet.
+  - `Idea` (from above): pay a low-level player in a strong party more.
+  - `Open`: should faster chambers pay more (the clock is already there)?
 - `Open`: how many rooms per maze, and does failing (the whole team dying, running out of
   filters) end it? The upload lore says dying costs you the rat, not your progress.
 - `Open`: which Roblox factory game is the reference for Research mode? And how does that mode

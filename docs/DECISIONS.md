@@ -770,6 +770,39 @@ break it.
 has been exported locally, because the export templates (about 1 GB) aren't installed on the dev
 machine. The preset itself loads: a local export stops only at the missing templates.
 
+## 2026-09-25: Runs pay into the local profile; the host clamps levels for difficulty
+
+**Decision (the storage design from "Player data is a local profile", now built):**
+- `players/Profile.cs` is the data (`Profile`: version, run count, money, active character, the
+  roster; `Character`: id, name, archetype, level, XP, rebirths, upgrades, abilities, `LastRun`),
+  plus its rules: `StartRun` (count the run; the active character's `LastRun` moves forward by
+  `RetrainRuns` = 3, capped), `Grant` (money and XP, levelling up at `100 × level` XP per level) and
+  `Sanitise` (clamps anything a hand-edited file got wrong).
+- `players/ProfileStore.cs` (autoload) loads `user://profile.json` the first time it's asked, or
+  the path given with `--profile=<path>` (a second copy of the game on the same PC, and the tests,
+  use their own). Saves go to a `.tmp` file and are then moved into place, so a crash mid-save can't
+  corrupt it; a file that won't parse is kept as `.bad` and a fresh profile started.
+- `MazeRun` numbers each run of the session (`runId`, sent with its state). Each peer's profile
+  counts a run the first time it sees that run active, late joiners included, so quitting can't
+  dodge the count. At the end, the host sends the pay (`Pay` RPC, every peer, once per run):
+  **100 money and 50 XP per chamber passed** (failed runs too), **plus 200 money and 100 XP for
+  passing the run**. Numbers are exports on `Main/Run`, to tune.
+- Each client reports its level to the host on joining; the host clamps it (1–50) and uses
+  **0.7 × average + 0.3 × highest** (DESIGN) to pick where in the chamber list the run starts: level
+  1 at the easiest, level 20+ halfway up. Runs still end at the hardest.
+- The result screen shows the pay (and a level-up); the main menu shows level, XP, money and runs.
+
+**Why:** the maze run had an end but paid nothing, so there was nothing to come back for.
+
+**How we verified it:** the offline smoke test (on its own profile) passes a run and fails one,
+then checks the run count, `LastRun`, money, level and XP, that it's on disk, and that an unreadable
+file is set aside. The network test checks every client (the late joiner too) was paid for the run
+and counted it once, and that the failed run afterwards paid nothing.
+
+**Not yet:** nothing to spend money on (the between-run hub / research tree is its own job), no
+abilities (so no decay effects yet, though `LastRun` is tracked), one character per profile (the
+roster exists in the file, there's no UI to make or pick another).
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:

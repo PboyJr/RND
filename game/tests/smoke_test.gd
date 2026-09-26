@@ -66,6 +66,10 @@ func _ready() -> void:
 	OS.add_logger(_errors)
 	_role = _arg("role", "scenes")
 	_network = get_node("/root/Network")
+	# A profile of the test's own (never the player's real one), fresh every run.
+	var profile_path := "user://smoke_profile_%s_%s.json" % [_role, _arg("index", "0")]
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(profile_path))
+	get_node("/root/ProfileStore").Path = profile_path
 	var timeout := TIMEOUT if _role in ["scenes", "capture", "audio"] else 300.0
 	get_tree().create_timer(float(_arg("timeout", str(timeout)))).timeout.connect(func(): _fail("timed out"); _finish())
 
@@ -619,9 +623,36 @@ func _run_offline_run() -> void:
 	health.TakeDamage(99999.0, 0)
 	_check(await _wait_until(func(): return run.Result == 2, 2.0), "run: everyone down didn't fail the run")
 	_check(health.IsDead, "run: a downed player came back on a timer in a chamber")
+	var money: int = 2 * run.PayPerChamber + run.PassBonusPay
+	var xp: int = 2 * run.XpPerChamber + run.PassBonusXp
 	_main.queue_free()
 	_main = null
 	await _frames(2)
+	_check_profile(money, xp)
+
+
+# The profile: both runs above counted when they started; the passed run paid 2 chambers + the
+# bonus, the failed one nothing. It's on disk, and an unreadable file is set aside, not fatal.
+func _check_profile(money: int, xp: int) -> void:
+	var store := get_node("/root/ProfileStore")
+	_check(store.RunCount == 2 and store.LastRun == 2, "profile: 2 runs started, but it counted %d (last run %d)" % [store.RunCount, store.LastRun])
+	_check(store.Money == money, "profile: the runs paid %d money, not %d" % [store.Money, money])
+	_check(store.Level == 2 and store.Xp == xp - 100, "profile: %d XP should make level 2 with %d over (level %d, %d XP)" % [xp, xp - 100, store.Level, store.Xp])
+	store.Reload()
+	_check(store.Money == money, "profile: the money wasn't saved (%d after reloading)" % store.Money)
+
+	var path: String = store.Path
+	var bad := "user://smoke_profile_bad.json"
+	var file := FileAccess.open(bad, FileAccess.WRITE)
+	file.store_string("{ this isn't json")
+	file.close()
+	store.Path = bad
+	store.Reload()
+	_check(store.Money == 0 and store.Level == 1, "profile: an unreadable file didn't give a fresh profile")
+	_check(FileAccess.file_exists(bad + ".bad"), "profile: the unreadable file wasn't kept aside")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(bad + ".bad"))
+	store.Path = path
+	store.Reload()
 
 
 # Hosting, or joining as a client (see net_suite.gd). The suite is a child node so its RPCs have the

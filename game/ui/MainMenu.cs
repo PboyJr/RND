@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using RND.Core;
+using RND.Players;
 
 namespace RND.UI;
 
@@ -11,6 +12,7 @@ public partial class MainMenu : Control
 	private Button _join;
 	private Label _status;
 	private OptionButton _level;
+	private Label _profile;
 
 	public override void _Ready()
 	{
@@ -19,6 +21,8 @@ public partial class MainMenu : Control
 		_join = GetNode<Button>("%Join");
 		_status = GetNode<Label>("%Status");
 		_level = GetNode<OptionButton>("%Level");
+		_profile = GetNode<Label>("%Profile");
+		ShowProfile();
 
 		_host.Pressed += OnHostPressed;
 		_join.Pressed += OnJoinPressed;
@@ -40,6 +44,7 @@ public partial class MainMenu : Control
 	{
 		Show();
 		_status.Text = message;
+		ShowProfile();
 		SetBusy(false);
 	}
 
@@ -62,6 +67,13 @@ public partial class MainMenu : Control
 
 		_status.Text = $"Connecting to {address}:{port}...";
 		SetBusy(true);
+	}
+
+	private void ShowProfile()
+	{
+		ProfileStore p = ProfileStore.Instance;
+		if (p != null)
+			_profile.Text = $"Level {p.Level} ({p.Xp} / {p.XpToNextLevel} XP)  ·  {p.Money} money  ·  {p.RunCount} runs";
 	}
 
 	private void SetBusy(bool busy)

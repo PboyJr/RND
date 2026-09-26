@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 
 Network="*res://core/Network.cs"
 Settings="*res://core/Settings.cs"
+ProfileStore="*res://players/ProfileStore.cs"
 
 [display]
 

@@ -45,6 +45,12 @@ layout_mode = 2
 text = "field research prototype"
 horizontal_alignment = 1
 
+[node name="Profile" type="Label" parent="Center/Panel"]
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.7)
+layout_mode = 2
+horizontal_alignment = 1
+
 [node name="Spacer" type="Control" parent="Center/Panel"]
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2

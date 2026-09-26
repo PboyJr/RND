@@ -612,7 +612,7 @@ func _crates_chamber() -> void:
 	# One at a time: several players converging on the plate at once knock each other's crates.
 	for j in crates.size():
 		if j % _early() == index:
-			await _carry(level.get_node("Props/" + crates[j]), plate.global_position + CORNERS[j], 1.1, [Vector3(0, 0, 0)])
+			await _carry(level.get_node("Props/" + crates[j]), plate.global_position + CORNERS[j], 1.1, [Vector3(0, 0, 0)], 0.6) # a dropped crate can bounce a little
 			await _walk([Vector3(-5.3, 0, 0.2 + 0.8 * index)]) # by the west wall, out of the next carrier's way
 		await _sync("c1 crate %d" % j)
 	await _sync("c1 crates down")
@@ -826,6 +826,11 @@ func _lob_at_button(jar: RigidBody3D, button: Node3D) -> bool:
 func _run_over() -> void:
 	var run := _run()
 	t._check(await t._wait_until(func(): return run.Result == 1, 10.0), "client %d: the run's pass never reached us (result %d)" % [index, run.Result])
+	# Everyone was paid for 3 chambers and the pass, into their own profile (the late joiner too).
+	var profile := get_node("/root/ProfileStore")
+	var paid: int = 3 * run.PayPerChamber + run.PassBonusPay
+	t._check(await t._wait_until(func(): return profile.Money == paid, 5.0), "client %d: paid %d money for the run, not %d" % [index, profile.Money, paid])
+	t._check(profile.RunCount == 1, "client %d: the run counted %d times on our profile" % [index, profile.RunCount])
 	if not await _arrive_in_chamber(0):
 		return
 	t._check(run.Result == 0, "client %d: the new run still shows the old result" % index)
@@ -852,4 +857,6 @@ func _run_over() -> void:
 	if _lead():
 		await _ask("kill_all")
 	t._check(await t._wait_until(func(): return run.Result == 2, 5.0), "client %d: everyone down didn't fail the run (result %d)" % [index, run.Result])
+	await t._seconds(0.5 + ping / 1000.0) # the (empty) pay for it
+	t._check(profile.RunCount == 2 and profile.Money == paid, "client %d: after a failed run in chamber 1: %d runs, %d money (want 2, %d)" % [index, profile.RunCount, profile.Money, paid])
 	await _sync("done", remaining)
