@@ -16,6 +16,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash # with pipefail, so a test piped through tee still fails its step
     steps:
       - uses: actions/checkout@v4
 
@@ -62,11 +65,22 @@ jobs:
       # Every run is wrapped in a timeout: if a test script fails to parse, Godot never quits.
       - name: Smoke test (offline)
         working-directory: game
-        run: timeout 300 "$GODOT" --headless res://tests/smoke_test.tscn -- --role=scenes --timeout=280
+        run: timeout 300 "$GODOT" --headless res://tests/smoke_test.tscn -- --role=scenes --timeout=280 2>&1 | tee "$RUNNER_TEMP/offline.log"
 
       - name: Smoke test (network, 2 clients at 150 ms with 2% loss)
         working-directory: game
-        run: timeout 420 "$GODOT" --headless res://tests/smoke_test.tscn -- --role=network --clients=2 --ping=150 --jitter=20 --loss=2 --out="$RUNNER_TEMP"
+        run: timeout 420 "$GODOT" --headless res://tests/smoke_test.tscn -- --role=network --clients=2 --ping=150 --jitter=20 --loss=2 --out="$RUNNER_TEMP" 2>&1 | tee "$RUNNER_TEMP/network.log"
+
+      # Reading a run's logs needs a GitHub sign-in, so this also puts the end of each test log on
+      # the run's summary page, as an error note.
+      - name: Show the end of the test logs
+        if: failure()
+        run: |
+          for log in "$RUNNER_TEMP"/*.log; do
+            [ -f "$log" ] || continue
+            body=$(grep -v '^\s*$' "$log" | tail -n 40 | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=$(basename "$log")::$body"
+          done
 
       - name: Keep the network test's client logs
         if: failure()
