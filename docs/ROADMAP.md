@@ -151,8 +151,9 @@ The team asked for "all of it": the hurdles we hadn't tackled yet, worked throug
        volumes, fullscreen, v-sync, 3D resolution) saved to disk. *Still to see:* the first CI run
        (after the branch is pushed) and a local export (needs the ~1 GB export templates)
 3. [x] **Rewards and saving:** a run pays money and XP into each player's own profile (saved safely, levels up); the party's level sets the starting difficulty. *Still to do:* something to spend money on
-4. [ ] **Enemy AI v3:** noises carry who made them, waiting at shut doors or finding another way,
-       several enemies sharing what they notice
+4. [x] **Enemy AI v3:** the pack converges on a spotter's growl, waits at shut doors (and comes
+       through when they open), learns where players keep getting away. *Still to do:* a level
+       with two or more evil guys, so the pack shows up in play
 5. [ ] **Chamber modules and a maze generator:** rooms with doorway connectors and difficulty tags,
        stitched into a maze the generator checks is solvable
 6. [ ] **Steam lobbies and relay:** friends over the internet (needs a two-account playtest at the end)

@@ -803,6 +803,34 @@ and counted it once, and that the failed run afterwards paid nothing.
 abilities (so no decay effects yet, though `LastRun` is tracked), one character per profile (the
 roster exists in the file, there's no UI to make or pick another).
 
+## 2026-09-25: Enemy AI v3: calls, waiting at doors, habits
+
+**Decision:** still only what it perceives, but it uses more of it.
+- **Calls.** When an evil guy spots someone, and again when it loses them, it growls a *call*
+  (`Level.EmitCall`): players hear the growl like any sound, and every other evil guy that can hear
+  it (walls muffle, as for noise) goes to the call's *lead*, where the player is (or, when lost,
+  where they were heading), not to the caller. The pack converges on you, and a lost chase becomes a
+  flank. It's fair: you hear the same growl.
+- **Waiting at doors.** `Investigate` checks whether its path reaches the spot. If not (behind a
+  shut door, since doors are walls to the navmesh), it goes as close as it can and waits there
+  (`State.Ambush`, `AmbushSeconds` = 20 s), facing the spot and re-checking every 0.5 s; when the door
+  opens it goes in. If there's another way round, that's simply the path it takes.
+- **Habits.** Where it loses sight of someone is remembered per level (`Level.RememberLostAt`,
+  spots within 2.5 m merge). A spot where players have got away twice or more is where it patrols
+  when calm, and the first place it checks when searching nearby (each spot at most every
+  `HabitCooldown` = 20 s). The more you hide somewhere, the more it looks there.
+- `Enemy.Hear` and `HearCall` share one hearing check (`HearingReach`).
+
+**Why:** the next step from the design's AI v3 list, and three known limitations: it stood at shut
+doors doing nothing, it had no way to share what it saw beyond a growl that pointed at itself, and
+it never learnt. Noise itself stays sourceless on purpose: a thrown crate should lure it away (the
+design's distraction play), which a noise that told it who threw it would spoil.
+
+**How we verified it:** offline smoke checks: a second evil guy that hears the first one's growl
+(but can't see you) heads for you, not the growler; losing you is remembered; a spot where players
+got away twice is the first place it patrols; in the closet chamber it waits by the shut door for 7 s
+after hearing a noise inside, and comes in when the door opens.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
@@ -820,7 +848,8 @@ Things the prototype does on purpose that we'll need to revisit:
   runtime"). It's harmless for grey-box levels and goes away once levels use real meshes with
   collision shapes (the navmesh already only reads colliders on the World layer).
 - The death "pose" is a placeholder (the capsule tips over), and respawn is a fixed 8 s timer.
-- Only one enemy type. It ignores thrown props, sound and light.
+- Only one enemy type, and it ignores light. Levels have one evil guy each; the pack behaviour (calls)
+  needs two or more, which no level has yet.
 - The enemy can drop down but never jump up. Drop links are one-way, and the only way up is a real
   ramp or stairs.
 - Drop links are generated once per bake. Anything that changes the level at runtime (a door, a
@@ -845,7 +874,8 @@ Things the prototype does on purpose that we'll need to revisit:
 - The projected HUD's layout assumes the visor shape (it avoids the nose cup at the bottom
   centre). If the visor shape changes, re-check `ui/visor_hud.tscn` anchors.
 - Noise carries no source, only a position and a radius. Hearing a crash sends it to the crash,
-  not to whoever threw the crate. Add a source back if AI ever needs to tell noises apart.
+  not to whoever threw the crate. That's on purpose (it makes distraction work); calls between evil
+  guys carry a lead instead.
 - The thrower's own flask appears after a network round trip (no client-side prediction).
 - Crack direction is a local guess (the nearest evil guy within 4 m), because `Health.Damaged`
   doesn't carry where a hit came from on clients. Send the hit position with the damage if
@@ -857,8 +887,6 @@ Things the prototype does on purpose that we'll need to revisit:
   left his spawn). Close Godot fully and reopen the project.
 - The evil guy walking through an open door is only checked as "a path exists", not by watching
   him walk it (drop links work the same way and he walks those).
-- Standing at a shut door is all he does about it: he doesn't wait for it to open, or look for
-  another way round, unless the search takes him there.
 - Doors and buttons have no sounds of their own (both reuse `Impact`), no ticking while a button
   runs down, and doors have no visible frame or track.
 - Each peer runs its own door, so a jam can differ slightly between peers for a moment: the

@@ -17,6 +17,7 @@ namespace RND.Levels;
 public partial class Level : Node3D
 {
 	private const float ReleaseSoundRadius = 40f; // the whole chamber hears the variable arrive
+	private const float LostSpotMerge = 2.5f;
 
 	public static Level Current { get; private set; }
 
@@ -36,6 +37,7 @@ public partial class Level : Node3D
 	private Node3D _enemies;
 	private Node3D _projectiles;
 	private bool _spawningPlayers;
+	private readonly List<(Vector3 Position, int Count)> _lostSpots = new();
 
 	public IEnumerable<Enemy> Enemies => _enemies.GetChildren().OfType<Enemy>();
 
@@ -101,6 +103,44 @@ public partial class Level : Node3D
 		foreach (Node child in _enemies.GetChildren())
 			(child as Enemy)?.Hear(position, radius);
 	}
+
+	/// <summary>
+	/// Host only. An enemy calling out to the others (a growl everyone hears): any enemy that hears it
+	/// heads for `lead`, the spot the caller is telling them about, rather than for the caller.
+	/// </summary>
+	public void EmitCall(Vector3 position, float radius, SoundKind sound, Vector3 lead, Enemy caller)
+	{
+		if (!Multiplayer.IsServer())
+			return;
+
+		Effects.Rpc(nameof(Effects.PlaySound), (int)sound, position, radius);
+		foreach (Node child in _enemies.GetChildren())
+			if (child is Enemy enemy && enemy != caller)
+				enemy.HearCall(position, radius, lead);
+	}
+
+	/// <summary>
+	/// Host only. Where players keep getting away: the enemies (who all tell this level) check those
+	/// spots more and more. Spots within LostSpotMerge of each other count as one.
+	/// </summary>
+	public void RememberLostAt(Vector3 position)
+	{
+		for (int i = 0; i < _lostSpots.Count; i++)
+		{
+			if (_lostSpots[i].Position.DistanceTo(position) < LostSpotMerge)
+			{
+				_lostSpots[i] = (_lostSpots[i].Position, _lostSpots[i].Count + 1);
+				return;
+			}
+		}
+		_lostSpots.Add((position, 1));
+	}
+
+	/// <summary>Host only. The spots where players got away, and how many times.</summary>
+	public IReadOnlyList<(Vector3 Position, int Count)> LostSpots => _lostSpots;
+
+	/// <summary>How many times players have got away near this point (for the tests).</summary>
+	public int TimesLostNear(Vector3 position) => _lostSpots.Where(s => s.Position.DistanceTo(position) < LostSpotMerge).Sum(s => s.Count);
 
 	/// <summary>
 	/// Host only. A sound everyone hears: players through their speakers (muffled by their mask),

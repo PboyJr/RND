@@ -13,7 +13,7 @@ extends Node
 ##   godot --headless res://tests/smoke_test.tscn -- --role=audio --out=C:/some/folder
 
 const PORT := 17777
-const TIMEOUT := 90.0
+const TIMEOUT := 150.0 # the offline suite takes about 70 s on the dev machine
 const SCENES := [
 	"res://core/main.tscn",
 	"res://levels/test_level.tscn",
@@ -114,12 +114,14 @@ func _run_scenes() -> void:
 	if player != null:
 		await _run_offline_combat(level, player)
 		await _run_offline_ai(level, player)
+		await _run_offline_pack(level, player)
 		await _run_offline_filter(level, player)
 		await _run_offline_liquid(level)
 	level.queue_free()
 	await _frames(2)
 	await _run_offline_chamber()
 	await _run_offline_chambers()
+	await _run_offline_ambush()
 	await _run_offline_run()
 
 
@@ -232,6 +234,7 @@ func _run_offline_ai(level: Node, player: Node3D) -> void:
 	var searching := await _wait_until(func(): return e.Mood == Mood.SUSPICIOUS, 3.0)
 	var goal: Vector3 = agent_target.call(e)
 	_check(searching and goal.distance_to(last_seen) < 1.5, "memory: after losing us it should search our last seen spot %s, went for %s" % [last_seen, goal])
+	_check(level.TimesLostNear(last_seen) == 1, "habits: losing us didn't get remembered (%d)" % level.TimesLostNear(last_seen))
 
 	# ...then gives up if it finds nothing.
 	player.global_position = Vector3(10, 0, 10) # far out of sight
@@ -293,6 +296,71 @@ func _run_offline_ai(level: Node, player: Node3D) -> void:
 		return crate.global_position.distance_to(crate_start) > 0.5, 4.0)
 	_check(shoved, "shove: didn't push a crate out of its way")
 	_log("AI v2: vision, memory, search, hearing, drop links (%d), shoving all behave" % links.size())
+
+
+# AI v3, the pack and its habits. One evil guy spots us and growls: a second one that heard the growl
+# (but can't see us) comes for *us*, not for the one that growled. And a spot where players keep
+# getting away is the first place it patrols.
+func _run_offline_pack(level: Node, player: Node3D) -> void:
+	var agent_target := func(e: Node): return (e.get_node("NavigationAgent3D") as NavigationAgent3D).target_position
+	var a := await _fresh_enemy(level)
+	a.WanderSpeed = 0.0
+	a.rotation = Vector3(0, PI, 0) # facing +z, into the room
+	var b := (load("res://enemies/enemy.tscn") as PackedScene).instantiate() as Node3D
+	b.position = Vector3(8, 0.05, -8)
+	b.rotation = Vector3(0, -PI / 2.0, 0) # facing the east wall, away from us
+	b.WanderSpeed = 0.0
+	level.get_node("Enemies").add_child(b, true) # a readable name, so the spawner can replicate it
+	await _frames(3)
+	player.global_position = a.global_position + Vector3(0, 0, 5) # in front of the first one
+	_check(await _wait_until(func(): return a.Mood == Mood.HUNTING, 3.0), "pack: the first evil guy didn't spot us")
+	var heard := await _wait_until(func(): return b.Mood == Mood.SUSPICIOUS, 1.0)
+	var goal: Vector3 = agent_target.call(b)
+	_check(heard and goal.distance_to(player.global_position) < 1.5, "pack: the second evil guy should head for us %s after the growl, went for %s (the growler is at %s)" % [player.global_position, goal, a.global_position])
+	b.queue_free()
+
+	# Habits: players got away twice near the table; once it's calm again, it patrols there first.
+	var spot := Vector3(6, 0, -3.5)
+	level.RememberLostAt(spot)
+	level.RememberLostAt(spot + Vector3(0.5, 0, 0))
+	var e := await _fresh_enemy(level)
+	player.global_position = Vector3(-10, 0, 10) # far away, out of sight
+	var patrolled := await _wait_until(func(): return (agent_target.call(e) as Vector3).distance_to(spot) < 1.5, 6.0)
+	_check(patrolled, "habits: didn't go and check the spot where players keep getting away (went for %s)" % agent_target.call(e))
+	_log("AI v3: the pack converges on a growl's lead, and it patrols where players got away")
+
+
+# A shut door between it and something it heard: it waits by the door (listening) instead of
+# wandering off, and goes through the moment the door opens.
+func _run_offline_ambush() -> void:
+	var level := (load("res://maze/test_chamber.tscn") as PackedScene).instantiate()
+	level.EnemyReleaseDelay = 0.3
+	add_child(level)
+	var enemies := level.get_node("Enemies")
+	if not _check(await _wait_until(func(): return enemies.get_child_count() == 1 and level.get_node("Navigation").navigation_mesh.get_polygon_count() > 0, 4.0), "ambush: no evil guy or navmesh"):
+		level.queue_free()
+		return
+	await _seconds(0.3)
+	var e := enemies.get_child(0) as Node3D
+	var player := level.get_node("Players/1") as Node3D
+	var door := level.get_node("Navigation/Geometry/ClosetDoor") as Node3D
+	player.global_position = Vector3(-7.9, 0.05, 1.0) # in the closet, door shut
+	e.global_position = Vector3(-3, 0.05, 1.5)
+	e.WanderSpeed = 0.0
+	await _frames(3)
+	level.EmitNoise(player.global_position, 14.0) # something in there made a noise
+	await _seconds(4.0)
+	var waiting: bool = e.Mood == Mood.SUSPICIOUS and e.global_position.distance_to(door.global_position - Vector3(0, 1.5, 0)) < 2.5
+	_check(waiting, "ambush: should be waiting by the closet door, is at %s (mood %d)" % [e.global_position, e.Mood])
+	await _seconds(3.0)
+	_check(e.global_position.distance_to(door.global_position - Vector3(0, 1.5, 0)) < 2.5, "ambush: gave up waiting by the door too soon (at %s)" % e.global_position)
+
+	level.get_node("Navigation/Geometry/ButtonInside").RequestPress() # we open the door from inside
+	var came_in := await _wait_until(func(): return e.global_position.x < -6.3 or e.Mood == Mood.HUNTING, 6.0)
+	_check(came_in, "ambush: didn't come through when the door opened (at %s, mood %d)" % [e.global_position, e.Mood])
+	_log("AI v3: waits at a shut door, comes through when it opens")
+	level.queue_free()
+	await _frames(2)
 
 
 # Audio: the buses exist (the World bus muffles through the mask), and every procedural sound renders

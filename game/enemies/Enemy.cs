@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using RND.Audio;
 using RND.Combat;
@@ -25,7 +27,7 @@ public partial class Enemy : CharacterBody3D
 {
 	public enum MoodKind { Calm, Suspicious, Hunting }
 
-	private enum State { Idle, Wander, Search, Chase, Windup, Recover }
+	private enum State { Idle, Wander, Search, Ambush, Chase, Windup, Recover }
 
 	private const float RemoteSmoothing = 14f;
 	private const float RemoteSnapDistance = 3f;
@@ -38,6 +40,9 @@ public partial class Enemy : CharacterBody3D
 	private const float ScanTurnRate = 1.6f;       // rad/s while looking around
 	private const float StuckSeconds = 0.75f;
 	private const float UnstickSeconds = 0.5f;
+	private const float SpottedCallRadius = 12f;   // the growl when it spots you
+	private const float LostCallRadius = 10f;      // the growl when it loses you ("over there")
+	private const float ReachCheckInterval = 0.5f; // how often a waiting evil guy checks if the way has opened
 	private static readonly Color HitColor = new(0.6f, 1f, 0.4f);
 
 	[ExportGroup("Movement")]
@@ -65,6 +70,10 @@ public partial class Enemy : CharacterBody3D
 	[ExportGroup("Search")]
 	[Export] public float SearchSeconds { get; set; } = 12f;
 	[Export] public float SearchRadius { get; set; } = 6f;
+	// Somewhere it can't get to (behind a shut door): it waits by the way in this long, listening.
+	[Export] public float AmbushSeconds { get; set; } = 20f;
+	// A spot where players got away twice or more gets checked on patrol, at most this often.
+	[Export] public float HabitCooldown { get; set; } = 20f;
 
 	[ExportGroup("Attack")]
 	[Export] public float AttackDamage { get; set; } = 20f;
@@ -112,6 +121,12 @@ public partial class Enemy : CharacterBody3D
 	private Vector3 _searchOrigin;
 	private float _lookTimer;
 	private float _scanDirection = 1f;
+
+	// Waiting by the way in to somewhere it can't reach.
+	private Vector3 _ambushFor;
+
+	// Habits: when it last checked each spot where players got away (host time, s).
+	private readonly Dictionary<Vector3, double> _spotCheckedAt = new();
 
 	// Getting unstuck.
 	private Vector3 _lastPosition;
@@ -169,16 +184,37 @@ public partial class Enemy : CharacterBody3D
 		if (Health.IsDead || _target != null)
 			return;
 
-		Vector3 ear = GlobalPosition + Vector3.Up * EyeHeight;
-		var wall = PhysicsRayQueryParameters3D.Create(ear, position + Vector3.Up * 0.3f, Layers.World);
-		float reach = radius * (GetWorld3D().DirectSpaceState.IntersectRay(wall).Count > 0 ? MuffledHearing : 1f);
-		float distance = ear.DistanceTo(position);
+		float distance = Ear.DistanceTo(position);
+		float reach = HearingReach(position, radius);
 		if (distance > reach)
 			return;
 
 		// Close noises are alarming, not just interesting: it's already half sure when it gets there.
 		_suspicion = Mathf.Max(_suspicion, Mathf.Lerp(0.8f, GlimpseThreshold, distance / reach));
 		Investigate(position);
+	}
+
+	/// <summary>
+	/// Host only, via Level.EmitCall: another evil guy growling about a player. If it hears the call
+	/// (walls muffle it like any noise), it goes where the caller is pointing, not to the caller: the
+	/// pack converges on you. Busy with a target, it ignores it.
+	/// </summary>
+	public void HearCall(Vector3 position, float radius, Vector3 lead)
+	{
+		if (Health.IsDead || _target != null || Ear.DistanceTo(position) > HearingReach(position, radius))
+			return;
+
+		_suspicion = Mathf.Max(_suspicion, 0.8f); // someone it trusts is sure
+		Investigate(lead);
+	}
+
+	private Vector3 Ear => GlobalPosition + Vector3.Up * EyeHeight;
+
+	// How far a noise of this radius carries to its ears: walls cut it down.
+	private float HearingReach(Vector3 position, float radius)
+	{
+		var wall = PhysicsRayQueryParameters3D.Create(Ear, position + Vector3.Up * 0.3f, Layers.World);
+		return radius * (GetWorld3D().DirectSpaceState.IntersectRay(wall).Count > 0 ? MuffledHearing : 1f);
 	}
 
 	// ── Perception ──────────────────────────────────────────────────────────────
@@ -262,7 +298,7 @@ public partial class Enemy : CharacterBody3D
 		bool spotted = _target == null;
 		_target = player; // set first, so it doesn't turn round to investigate its own growl
 		if (spotted)
-			Voice(SoundKind.Growl, 12f); // "it's seen me" (and it tells any others nearby)
+			Call(player.GlobalPosition, SpottedCallRadius); // "it's seen me", and any others nearby come for me
 		_suspicion = 1f;
 		_timeSinceSeen = 0f;
 		_lastSeenPosition = player.GlobalPosition;
@@ -271,18 +307,99 @@ public partial class Enemy : CharacterBody3D
 			EnterState(State.Chase);
 	}
 
+	// Go and look. If it can't get there (behind a shut door), it goes as close as it can and waits
+	// there instead of wandering off: see UpdateAmbush. Another way round, if there is one, is just
+	// the path it takes.
 	private void Investigate(Vector3 point)
 	{
-		_searchOrigin = SnapToNavmesh(point);
+		Vector3 spot = SnapToNavmesh(point);
+		if (!CanReach(spot, out Vector3 closest))
+		{
+			_ambushFor = spot;
+			_agent.TargetPosition = closest;
+			EnterState(State.Ambush, AmbushSeconds);
+			return;
+		}
+
+		_searchOrigin = spot;
 		_agent.TargetPosition = _searchOrigin;
 		_lookTimer = _rng.RandfRange(1.5f, 2.5f);
 		EnterState(State.Search, SearchSeconds);
 	}
 
+	// Whether its path reaches the point, and where the path ends if not. Before the navmesh is baked
+	// it assumes it can.
+	private bool CanReach(Vector3 point, out Vector3 pathEnd)
+	{
+		pathEnd = point;
+		Rid map = GetWorld3D().NavigationMap;
+		if (NavigationServer3D.MapGetIterationId(map) == 0)
+			return true;
+
+		Vector3[] path = NavigationServer3D.MapGetPath(map, GlobalPosition, point, true);
+		if (path.Length == 0)
+		{
+			pathEnd = GlobalPosition;
+			return false;
+		}
+		pathEnd = path[^1];
+		return pathEnd.DistanceTo(point) < 0.75f;
+	}
+
+	// Waiting by the door: stand as close as it can get, facing the place it can't reach, and keep
+	// checking whether the way has opened. Seeing or hearing someone breaks it off as usual.
+	private void UpdateAmbush(float dt)
+	{
+		if (_stateTimer <= 0f)
+		{
+			_suspicion = 0f;
+			EnterState(State.Idle, _rng.RandfRange(1f, 2f));
+			return;
+		}
+
+		if (!_agent.IsNavigationFinished())
+		{
+			_moveSpeed = SearchSpeed;
+			return;
+		}
+
+		_moveSpeed = 0f;
+		FaceTowards(_ambushFor, dt);
+		_repathTimer -= dt;
+		if (_repathTimer > 0f)
+			return;
+		_repathTimer = ReachCheckInterval;
+		if (CanReach(_ambushFor, out _))
+		{
+			float left = _stateTimer;
+			Investigate(_ambushFor); // the door's open: go and look
+			_stateTimer = Mathf.Max(_stateTimer, left);
+		}
+	}
+
+	// A spot where players have got away before (twice or more) that it hasn't checked lately, and can
+	// reach, nearest first; or null.
+	private Vector3? HabitSpot(Vector3 near, float within)
+	{
+		double now = Time.GetTicksMsec() / 1000.0;
+		foreach (var (position, _) in (Level.Current?.LostSpots ?? []).Where(s => s.Count >= 2)
+			.OrderBy(s => s.Position.DistanceTo(near)))
+		{
+			if (position.DistanceTo(near) > within || now - _spotCheckedAt.GetValueOrDefault(position, double.MinValue) < HabitCooldown)
+				continue;
+			Vector3 spot = SnapToNavmesh(position);
+			if (!CanReach(spot, out _))
+				continue;
+			_spotCheckedAt[position] = now;
+			return spot;
+		}
+		return null;
+	}
+
 	private MoodKind CurrentMood() => _state switch
 	{
 		State.Chase or State.Windup or State.Recover when _target != null => MoodKind.Hunting,
-		State.Search => MoodKind.Suspicious,
+		State.Search or State.Ambush => MoodKind.Suspicious,
 		_ => _suspicion >= GlimpseThreshold ? MoodKind.Suspicious : MoodKind.Calm,
 	};
 
@@ -298,7 +415,8 @@ public partial class Enemy : CharacterBody3D
 				_moveSpeed = 0f;
 				if (_stateTimer <= 0f)
 				{
-					_agent.TargetPosition = RandomReachablePoint(_home, WanderRadius);
+					// Patrol: past a spot where players keep getting away, if it hasn't checked one lately.
+					_agent.TargetPosition = HabitSpot(GlobalPosition, float.MaxValue) ?? RandomReachablePoint(_home, WanderRadius);
 					EnterState(State.Wander, 12f);
 				}
 				break;
@@ -311,6 +429,10 @@ public partial class Enemy : CharacterBody3D
 
 			case State.Search:
 				UpdateSearch(dt);
+				break;
+
+			case State.Ambush:
+				UpdateAmbush(dt);
 				break;
 
 			case State.Chase:
@@ -351,11 +473,15 @@ public partial class Enemy : CharacterBody3D
 		bool visible = _timeSinceSeen == 0f;
 		if (_timeSinceSeen > LoseSightGrace)
 		{
-			// Trail's gone cold: it doesn't know where you are, only where you were heading.
+			// Trail's gone cold: it doesn't know where you are, only where you were heading. It remembers
+			// where it lost you (it'll check there again), and calls out to the others where you went.
 			Vector3 heading = _lastSeenVelocity with { Y = 0f };
+			Vector3 guess = _lastSeenPosition + heading * PredictSeconds;
 			_target = null;
 			_suspicion = GlimpseThreshold;
-			Investigate(_lastSeenPosition + heading * PredictSeconds);
+			Level.Current?.RememberLostAt(_lastSeenPosition);
+			Call(guess, LostCallRadius);
+			Investigate(guess);
 			return;
 		}
 
@@ -384,6 +510,10 @@ public partial class Enemy : CharacterBody3D
 	private void Voice(SoundKind sound, float radius) =>
 		Level.Current?.EmitSound(GlobalPosition + Vector3.Up * EyeHeight, radius, sound);
 
+	// Host only. A growl players hear too, telling other evil guys where to go.
+	private void Call(Vector3 lead, float radius) =>
+		Level.Current?.EmitCall(GlobalPosition + Vector3.Up * EyeHeight, radius, SoundKind.Growl, lead, this);
+
 	// Go to the spot, look around, then check other spots nearby until time runs out.
 	private void UpdateSearch(float dt)
 	{
@@ -408,7 +538,8 @@ public partial class Enemy : CharacterBody3D
 			return;
 		}
 
-		_agent.TargetPosition = RandomReachablePoint(_searchOrigin, SearchRadius);
+		// Next, a nearby spot where players have hidden before, else anywhere around.
+		_agent.TargetPosition = HabitSpot(_searchOrigin, SearchRadius * 2f) ?? RandomReachablePoint(_searchOrigin, SearchRadius);
 		_lookTimer = _rng.RandfRange(1f, 2f);
 		_scanDirection = _rng.Randf() < 0.5f ? -1f : 1f;
 	}

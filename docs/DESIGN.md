@@ -509,9 +509,18 @@ filter, see Lore → "The mask is the lie".)
   standing on a platform doesn't just get you hit from below. It walks round and comes up.
   If you're somewhere it genuinely can't reach, it waits below and watches you.
 - Respawns **12 s** after dying (prototype convenience).
-- `Idea` (AI v3): learn habits (the spot you keep kiting to, the hiding place you reuse); react to
-  light (flashlights?); crouching for quieter movement; multiple evil guys that share what they
-  notice; distraction play (throw a crate to lure it away).
+- **AI v3** (`Decided` for the prototype, 2026-09-25):
+  - **It calls the pack.** Spotting you, it growls; any other evil guy that hears that growl comes
+    for *you*, not for the one that growled. Losing you, it growls again, and the others head for
+    where you were going. You hear every call too, so you know the pack is coming.
+  - **It waits at doors.** If you (or a noise) are somewhere it can't get to, like behind a shut
+    door, it waits by the door for 20 s, listening, and comes through the moment it opens. If there's
+    another way round, it takes it.
+  - **It learns your hiding spots.** Wherever it loses someone twice or more, it starts checking on
+    patrol, and first when searching nearby. Keep using the same trick and it stops working.
+  - **It can be lured**: a crash is just a noise at the crash, so throwing a crate draws it away.
+- `Idea` (later): react to light (flashlights?); crouching for quieter movement; more than one evil
+  guy per chamber so the pack actually forms (harder runs?).
 - `Open`: what is it, lore-wise? Can it be researched (evidence it leaves behind)?
 
 #### Player monsters on phones (`Idea`)
