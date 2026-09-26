@@ -3,7 +3,7 @@
 What's done, what's next, and what's parked. Design detail lives in [DESIGN.md](DESIGN.md), and the
 reasons behind tech choices live in [DECISIONS.md](DECISIONS.md).
 
-Last updated: 2026-09-25 (M8: two new chambers and a difficulty ramp; more chambers in progress)
+Last updated: 2026-09-25 (M9 network hardening done; the big push is under way)
 
 ---
 
@@ -140,6 +140,40 @@ through the chambers under pressure → pass or fail → reward → go again.
   - [ ] Starting difficulty from the party's level (needs player levels first)
 - [ ] Between runs: somewhere to spend the reward (upgrades / research tree), instead of an
       automatic restart
+
+### The big push (started 2026-09-25)
+
+The team asked for "all of it": the hurdles we hadn't tackled yet, worked through in this order.
+
+1. [x] **Network hardening** (details below)
+2. [ ] **A build anyone can run:** export preset, CI (build, smoke test, Windows zip on every
+       push), settings menu (sensitivity, volume, fullscreen, graphics) saved to disk
+3. [ ] **Rewards and saving:** the run pays out into the local profile (M8's next item)
+4. [ ] **Enemy AI v3:** noises carry who made them, waiting at shut doors or finding another way,
+       several enemies sharing what they notice
+5. [ ] **Chamber modules and a maze generator:** rooms with doorway connectors and difficulty tags,
+       stitched into a maze the generator checks is solvable
+6. [ ] **Steam lobbies and relay:** friends over the internet (needs a two-account playtest at the end)
+
+### M9: Network hardening ✅ (2026-09-25)
+
+Goal: the game holds up over a real internet connection, with a full party, people joining late
+and leaving.
+
+- [x] One-command network test (`--role=network`): the host starts up to 4 clients (the last
+      joins mid-run) and they play the sandbox and a whole maze run like players would, optionally
+      through a fake bad connection (`--ping`, `--jitter`, `--loss`)
+- [x] Passes with 4 clients at 250 ms / 5% loss, 3 at 150 ms / 2% loss, and 1–2 with no lag
+- [x] Carried props are simulated by the carrier: they trail 0.5 m instead of 2–3 m at 150 ms, and
+      land where the carrier dropped them
+- [x] Player state goes through the host; clients never talk to each other (no engine errors on
+      level changes, late joins, or several people leaving at once)
+- [x] Level changes wait for clients (fixed a skipped chamber)
+- [x] Leavers are let go at once; dropped connections after 6 s instead of 30
+- [x] Late joiners see the right chamber clock, props and doors
+- [x] Spawn points handed out by the host (no two players on one spot)
+- [x] Reach checks use where the player really is, so lag doesn't refuse throws, grabs or revives
+- [x] Players pass through each other; downed players lie down (and still weigh down a plate)
 
 ---
 

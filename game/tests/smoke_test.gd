@@ -2,8 +2,10 @@ extends Node
 
 ## Headless smoke test. Run from the game/ folder:
 ##   godot --headless res://tests/smoke_test.tscn -- --role=scenes
-##   godot --headless res://tests/smoke_test.tscn -- --role=host     (start first)
-##   godot --headless res://tests/smoke_test.tscn -- --role=client
+##   godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --ping=150 --jitter=20 --loss=2
+## The network role hosts and starts its own clients (the last joins mid-run), optionally behind a
+## fake bad connection, and plays the sandbox and a whole maze run (see net_suite.gd). Client logs
+## go to --out. By hand, in two terminals: --role=host (first), then --role=client.
 ## Prints "SMOKE PASS" or "SMOKE FAIL: ..." lines and exits with 0 / 1.
 ## Visual check (needs a real window, so no --headless): saves visor screenshots to --out.
 ##   godot --resolution 1280x720 res://tests/smoke_test.tscn -- --role=capture --out=C:/some/folder
@@ -39,6 +41,7 @@ var _finished := false
 var _main: Node
 var _network: Node
 var _errors := ErrorCatcher.new()
+var _proxy # LagProxy, when a client plays over a fake internet connection
 
 
 # A script error or C# exception only aborts the function it happens in, so the run carries on and
@@ -62,12 +65,12 @@ func _ready() -> void:
 	OS.add_logger(_errors)
 	_role = _arg("role", "scenes")
 	_network = get_node("/root/Network")
-	get_tree().create_timer(TIMEOUT).timeout.connect(func(): _fail("timed out"); _finish())
+	var timeout := TIMEOUT if _role in ["scenes", "capture", "audio"] else 300.0
+	get_tree().create_timer(float(_arg("timeout", str(timeout)))).timeout.connect(func(): _fail("timed out"); _finish())
 
 	match _role:
 		"scenes": await _run_scenes()
-		"host": await _run_host()
-		"client": await _run_client()
+		"host", "network", "client": await _run_network()
 		"capture": await _run_capture()
 		"audio": _check_audio(_arg("out", OS.get_user_data_dir()), true)
 		_: _fail("unknown role '%s'" % _role)
@@ -599,26 +602,27 @@ func _run_offline_run() -> void:
 	await _frames(2)
 
 
-# The host's player lies dead (see _run_host). A teammate next to it revives it at half health where it
-# fell; from across the room, nothing happens.
-func _run_network_revive(me: Node3D) -> void:
-	var host_player := _players().get_node("1") as Node3D
-	var health := host_player.get_node("Health")
-	if not _check(health.IsDead, "revive: the host's player should be lying dead"):
+# Hosting, or joining as a client (see net_suite.gd). The suite is a child node so its RPCs have the
+# same path on every peer.
+func _run_network() -> void:
+	var net: Node = preload("res://tests/net_suite.gd").new()
+	net.name = "Net"
+	net.t = self
+	net.index = int(_arg("index", "0"))
+	net.total = int(_arg("clients", "3" if _role == "network" else "1"))
+	net.ping = float(_arg("ping", "0"))
+	if not _check(net.total <= net.MAX_CLIENTS, "the network test plays at most %d clients" % net.MAX_CLIENTS):
 		return
-	if me.global_position.distance_to(host_player.global_position) > 4.0:
-		host_player.rpc_id(1, "RequestRevive")
-		await _seconds(0.5)
-		_check(health.IsDead, "revive: revived from %.1f m away" % me.global_position.distance_to(host_player.global_position))
-	var fell_at := host_player.global_position
-	me.global_position = fell_at + Vector3(0, 0.05, 1.2)
-	await _seconds(0.3) # let the host see us next to it
-	host_player.rpc_id(1, "RequestRevive")
-	_check(await _wait_until(func(): return not health.IsDead, 2.0), "revive: standing next to it didn't revive the host's player")
-	_check(absf(health.Current - 50.0) < 0.1, "revive: came back with %.0f health, not 50" % health.Current)
-	await _seconds(0.3)
-	_check(host_player.global_position.distance_to(fell_at) < 1.0, "revive: the revived player was moved to a spawn point")
-	_log("revive: host's player back at %.0f health where it fell" % health.Current)
+	add_child(net)
+	match _role:
+		"network":
+			net.has_late = net.total >= 2
+			await net.run_host(true)
+		"host":
+			await net.run_host(false)
+		"client":
+			net.has_late = _arg("late", "0") == "1"
+			await net.run_client()
 
 
 # Kills whatever's there and waits for the level to spawn a fresh, calm evil guy.
@@ -631,95 +635,6 @@ func _fresh_enemy(level: Node) -> Node3D:
 	await _wait_until(func(): return enemies.get_child_count() == 1, 2.0)
 	await _frames(2)
 	return enemies.get_child(0) as Node3D
-
-
-func _run_host() -> void:
-	_start_main()
-	if not _check(_network.Host(PORT) == OK, "host: couldn't open port %d" % PORT):
-		return
-	if not _check(await _wait_until(func(): return _players() != null and _players().has_node("1"), 5.0), "host: level never loaded"):
-		return
-	# Take the host's own (idle) player out of play, so the evil guy can only lock on to the client
-	# the network checks are about. Otherwise it sometimes spots the host first and ignores the client.
-	var own := _players().get_node("1")
-	own.RespawnDelay = 999.0
-	own.get_node("Health").TakeDamage(99999.0, 0)
-	_log("hosting, waiting for a client")
-
-	if not _check(await _wait_until(func(): return not multiplayer.get_peers().is_empty(), 30.0), "host: no client connected"):
-		return
-	var client_id := multiplayer.get_peers()[0]
-	_check(await _wait_until(func(): return _players().has_node(str(client_id)), 5.0), "host: client's player not spawned")
-	_log("client %d joined" % client_id)
-
-	_check(await _wait_until(func(): return multiplayer.get_peers().is_empty(), 30.0), "host: client never left")
-	await _frames(10)
-	_check(not _players().has_node(str(client_id)), "host: client's player not removed after it left")
-	_network.Leave()
-
-
-func _run_client() -> void:
-	_start_main()
-	if not _check(_network.Join("127.0.0.1", PORT) == OK, "client: couldn't start connecting"):
-		return
-	var joined := await _wait_until(func(): return _players() != null and _players().get_child_count() >= 2, 15.0)
-	if not _check(joined, "client: level / players never replicated"):
-		return
-
-	var my_id := multiplayer.get_unique_id()
-	var me := _players().get_node_or_null(str(my_id)) as Node3D
-	if not _check(me != null, "client: own player missing"):
-		return
-	_check(me.is_multiplayer_authority(), "client: doesn't own its player")
-	_check(_players().has_node("1"), "client: host's player missing")
-	_log("joined as %d, players: %s" % [my_id, _players().get_children().map(func(p): return str(p.name))])
-
-	var jar := _level().get_node("Props/JarA") as RigidBody3D
-	_check(jar.freeze, "client: props should be frozen (the host simulates them)")
-
-	# Walk up to the jar (facing it) and grab it.
-	me.global_position = jar.global_position + Vector3(0, -0.175, 1.5)
-	await _seconds(0.5) # let the host see where we are
-	jar.rpc_id(1, "RequestGrab")
-	if not _check(await _wait_until(func(): return jar.HeldBy == my_id, 3.0), "client: host didn't confirm the grab (HeldBy=%s)" % jar.HeldBy):
-		return
-
-	await _seconds(1.0)
-	var head := me.get_node("Head") as Node3D
-	var hold_point: Vector3 = head.global_position - head.global_basis.z * me.SyncHoldDistance
-	var hold_error := jar.global_position.distance_to(hold_point)
-	_check(hold_error < 0.5, "client: held jar isn't following the hold point (off by %.2f m)" % hold_error)
-	_log("carrying jar at %s (%.2f m from hold point)" % [jar.global_position, hold_error])
-
-	var before := jar.global_position
-	jar.rpc_id(1, "RequestThrow")
-	_check(await _wait_until(func(): return jar.HeldBy == 0, 3.0), "client: throw didn't release the jar")
-	await _seconds(0.4)
-	_check(jar.global_position.z < before.z - 1.0, "client: jar didn't fly forward (z %.2f -> %.2f)" % [before.z, jar.global_position.z])
-	_log("threw jar: %s -> %s" % [before, jar.global_position])
-
-	await _run_network_filter(me)
-	await _run_network_combat(me, head)
-	await _run_network_revive(me)
-
-	_network.Leave()
-	await _frames(5)
-	_check(_level() == null, "client: level not cleared after leaving")
-
-
-# The host breathes for us (drains our filter) and replicates it; a spare canister refills it.
-func _run_network_filter(me: Node3D) -> void:
-	var respirator := me.get_node("Respirator")
-	var capacity: float = respirator.Capacity
-	_check(await _wait_until(func(): return respirator.Remaining < capacity, 3.0), "client: filter never drained (host breathing not replicating?)")
-
-	var canister := _level().get_node("Props/FilterB") as Node3D # on the table
-	me.global_position = Vector3(canister.global_position.x, 0.05, -4.5) # beside the table
-	await _seconds(0.3) # let the host see us next to it
-	canister.rpc_id(1, "RequestUse")
-	var refilled := await _wait_until(func(): return canister.Consumed and respirator.Remaining > capacity - 1.0, 2.0)
-	_check(refilled, "client: a spare filter didn't refill us and vanish (remaining %.1f, consumed %s)" % [respirator.Remaining, canister.Consumed])
-	_log("filter: drained to <%d s, spare canister refilled it" % capacity)
 
 
 # Visual + level check (needs a real window and sound): host a session, save screenshots of the visor
@@ -877,33 +792,21 @@ func _brightness(image: Image) -> float:
 	return total / count
 
 
-# The host runs the evil guy and all damage. The client gets hit, then hits back.
-func _run_network_combat(me: Node3D, head: Node3D) -> void:
-	var enemies := _level().get_node("Enemies")
-	if not _check(await _wait_until(func(): return enemies.get_child_count() > 0, 5.0), "client: evil guy never replicated"):
-		return
-	var enemy := enemies.get_child(0) as Node3D
-	var enemy_health := enemy.get_node("Health")
-	var my_health := me.get_node("Health")
-
-	# Stay next to it (room-centre side, same level) until it swings: proves the host's AI picks us
-	# and its damage replicates back to us.
-	var got_hit := await _wait_until(func():
-		if me.global_position.distance_to(enemy.global_position) > 1.6:
-			var away := -enemy.global_position * Vector3(1, 0, 1)
-			me.global_position = enemy.global_position + (away.normalized() if away.length() > 1.0 else Vector3.BACK) * 1.2
-		return my_health.Current < my_health.MaxHealth, 8.0)
-	if not _check(got_hit, "client: evil guy never hurt us (host damage didn't replicate?)"):
-		return
-	_log("evil guy hit us: %.0f / %.0f" % [my_health.Current, my_health.MaxHealth])
-
-	# It stands still recovering from the swing, so a point-blank throw must land. (At range, a
-	# path-following target can legitimately dodge, which made this flaky.)
-	var start_health: float = enemy_health.Current
-	var eye := head.global_position
-	me.rpc_id(1, "RequestThrowItem", 1, eye, (enemy.global_position + Vector3.UP * 1.2 - eye).normalized())
-	_check(await _wait_until(func(): return enemy_health.Current < start_health, 2.0), "client: point-blank acid flask didn't hurt the evil guy")
-	_log("flask hit: evil guy at %.0f / %.0f" % [enemy_health.Current, enemy_health.MaxHealth])
+# The port a client joins: the host's, or a lag proxy in front of it when --ping / --loss ask for a
+# bad connection (--ping is the round trip in ms, --jitter extra ms per packet, --loss a percentage).
+func _connect_port() -> int:
+	var ping := float(_arg("ping", "0"))
+	var loss := float(_arg("loss", "0")) / 100.0
+	if ping <= 0.0 and loss <= 0.0:
+		return PORT
+	_proxy = preload("res://tests/lag_proxy.gd").new()
+	_proxy.delay_ms = ping / 2.0
+	_proxy.jitter_ms = float(_arg("jitter", "0"))
+	_proxy.loss = loss
+	var port := PORT + 100 + int(_arg("index", "0"))
+	_proxy.start(port, PORT)
+	_log("playing through a lag proxy: %.0f ms round trip, +%.0f ms jitter, %.0f%% loss" % [ping, _proxy.jitter_ms, loss * 100.0])
+	return port
 
 
 func _start_main() -> void:
@@ -964,6 +867,10 @@ func _finish() -> void:
 	if _finished:
 		return
 	_finished = true
+	if _proxy:
+		var bytes: Vector2i = _proxy.counts()
+		_log("traffic through the proxy: %.1f KB up, %.1f KB down" % [bytes.x / 1024.0, bytes.y / 1024.0])
+		_proxy.stop()
 	OS.remove_logger(_errors)
 	for error in _errors.messages:
 		_fail("error logged: " + error)

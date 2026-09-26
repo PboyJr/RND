@@ -60,7 +60,8 @@ public partial class MazeRun : Node
 
 	public override void _PhysicsProcess(double delta)
 	{
-		if (!Active || !Multiplayer.IsServer())
+		// While the next chamber is on its way, the old one (already passed) is still loaded.
+		if (!Active || !Multiplayer.IsServer() || GetParent<Main>().ChangingLevel)
 			return;
 
 		if (_nextAt >= 0)

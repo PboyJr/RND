@@ -31,6 +31,7 @@ public partial class Player : CharacterBody3D
 	private const float ReviveRange = 2f;
 	private const float ReviveSeconds = 3f;
 	private const float ReviveHealth = 50f;
+	private const int ReportEveryFrames = 2; // owner → host state reports: 30 a second at 60 physics ticks
 	private static readonly Color HurtColor = new(1f, 0.2f, 0.15f);
 
 	private static readonly Dictionary<int, Player> ByPeer = new();
@@ -74,16 +75,28 @@ public partial class Player : CharacterBody3D
 	[Export] public float SelectedItemCharge { get; set; } = 1f; // 0 = just used, 1 = ready
 
 	public int PeerId { get; private set; }
+	/// <summary>Which of the level's spawn points is ours, handed out by the host (Level.AddPlayer).</summary>
+	public int SpawnSlot { get; set; } = -1;
 	public Health Health { get; private set; }
 	public Respirator Respirator { get; private set; }
 	public Breathing Breathing { get; private set; }
 	public bool IsDead => Health?.IsDead ?? false;
 	public int SlotCount => Mathf.Min(1 + Loadout.Count, MaxSlots);
-	public Vector3 EyePosition => _head.GlobalPosition;
+	/// <summary>
+	/// For someone else's player, where their latest report puts their eyes, not the smoothed body we
+	/// draw (which trails it). The host checks reach against this, so lag doesn't make it refuse a
+	/// throw, grab or revive the player really was close enough for.
+	/// </summary>
+	public Vector3 EyePosition => IsMultiplayerAuthority() ? _head.GlobalPosition : SyncPosition + Vector3.Up * _head.Position.Y;
 	public Vector3 AimDirection => -_head.GlobalBasis.Z;
 
-	/// <summary>World-space point a held prop gets pulled toward.</summary>
-	public Vector3 HoldPoint => EyePosition + AimDirection * SyncHoldDistance;
+	/// <summary>
+	/// World-space point a held prop gets pulled toward. For someone else's player it's worked out
+	/// from their latest report rather than the smoothed body we draw, which trails it.
+	/// </summary>
+	public Vector3 HoldPoint => IsMultiplayerAuthority()
+		? EyePosition + AimDirection * SyncHoldDistance
+		: EyePosition + new Basis(Vector3.Up, SyncYaw) * new Basis(Vector3.Right, SyncPitch) * Vector3.Forward * SyncHoldDistance;
 
 	/// <summary>Contextual prompt for the HUD.</summary>
 	public string Hint
@@ -135,6 +148,7 @@ public partial class Player : CharacterBody3D
 	private Camera3D _camera;
 	private RayCast3D _grabRay;
 	private MeshInstance3D _bodyMesh;
+	private CollisionShape3D _bodyShape;
 	private MeshInstance3D _visor;
 	private Node3D _handItem;
 	private Liquid _handLiquid;
@@ -148,6 +162,8 @@ public partial class Player : CharacterBody3D
 	private float _footstepTimer;
 	private Player _reviveTarget;
 	private float _reviveProgress;
+	private MultiplayerSynchronizer _sync;
+	private bool _reporting = true;
 
 	// Per-slot "ready again at" times. The owner uses theirs for the HUD; the host keeps its own to validate throws.
 	private readonly double[] _readyAt = new double[MaxSlots];
@@ -168,6 +184,11 @@ public partial class Player : CharacterBody3D
 		SetMultiplayerAuthority(PeerId);
 		GetNode("Health").SetMultiplayerAuthority(1); // health and filter belong to the host
 		GetNode("Respirator").SetMultiplayerAuthority(1);
+		// The owner reports its state to the host, and the host replicates it to everyone else (see
+		// ReportState). Only the host ever sends synchronizer data, so a client never gets state for a
+		// player it hasn't spawned yet, or that the host has just removed.
+		_sync = GetNode<MultiplayerSynchronizer>("MultiplayerSynchronizer");
+		_sync.SetMultiplayerAuthority(1);
 		ByPeer[PeerId] = this;
 	}
 
@@ -188,6 +209,7 @@ public partial class Player : CharacterBody3D
 		_handLiquid = (Liquid)_handItem.FindChild("Liquid", owned: false); // wherever the model nests it
 		_handFullFill = _handLiquid.Fill;
 		_bodyMesh = GetNode<MeshInstance3D>("Body");
+		_bodyShape = GetNode<CollisionShape3D>("CollisionShape3D");
 		_visor = GetNode<MeshInstance3D>("Head/Visor");
 		_nameLabel = GetNode<Label3D>("NameLabel");
 		Health = GetNode<Health>("Health");
@@ -203,6 +225,10 @@ public partial class Player : CharacterBody3D
 		bool isLocal = IsMultiplayerAuthority();
 		SetUpVisuals(isLocal);
 		SetDeadVisuals(IsDead);
+		// Not back to the owner: what it controls (slot, hold distance) mustn't be overwritten by the
+		// host's older copy. (The synchronizer is rooted on itself, so this doesn't hide the player.)
+		if (Multiplayer.IsServer())
+			_sync.AddVisibilityFilter(Callable.From((int peer) => peer != PeerId));
 
 		if (isLocal)
 		{
@@ -287,6 +313,8 @@ public partial class Player : CharacterBody3D
 				MoveToSpawnPoint();
 
 			WriteSyncState();
+			if (!Multiplayer.IsServer() && _reporting && Engine.GetPhysicsFrames() % ReportEveryFrames == 0)
+				RpcId(1, MethodName.ReportState, SyncPosition, SyncYaw, SyncPitch, SyncHoldDistance, SelectedSlot, SelectedItemCharge);
 		}
 		else
 		{
@@ -400,7 +428,7 @@ public partial class Player : CharacterBody3D
 		}
 		else if (CanAct && Input.IsActionJustPressed("secondary"))
 		{
-			_heldProp.RpcId(1, nameof(PhysicsProp.RequestThrow));
+			_heldProp.Throw(AimDirection);
 			_heldProp = null;
 		}
 		else if (!CanAct || !Input.IsActionPressed("primary"))
@@ -430,7 +458,7 @@ public partial class Player : CharacterBody3D
 	private void ReleaseHeldProp()
 	{
 		if (_heldProp != null && IsInstanceValid(_heldProp))
-			_heldProp.RpcId(1, nameof(PhysicsProp.RequestRelease));
+			_heldProp.Release();
 		_heldProp = null;
 	}
 
@@ -497,7 +525,7 @@ public partial class Player : CharacterBody3D
 			return;
 
 		if (TryGet(Multiplayer.SenderId(), out Player reviver) && reviver != this && !reviver.IsDead
-			&& reviver.GlobalPosition.DistanceTo(GlobalPosition) < ReviveRange + 1f) // slack for lag
+			&& reviver.SyncPosition.DistanceTo(SyncPosition) < ReviveRange + 1f) // latest reports, plus slack for lag
 			Health.ReviveTo(ReviveHealth);
 	}
 
@@ -509,6 +537,28 @@ public partial class Player : CharacterBody3D
 		SyncYaw = Rotation.Y;
 		SyncPitch = _head.Rotation.X;
 	}
+
+	/// <summary>
+	/// Owner → host, 30 times a second. The host copies it into the Sync properties, which its
+	/// synchronizer sends on. Same ordered channel as Main's level-change handshake, so nothing sent
+	/// before the handshake can arrive after it.
+	/// </summary>
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = Network.StateChannel)]
+	private void ReportState(Vector3 position, float yaw, float pitch, float holdDistance, int slot, float charge)
+	{
+		if (!Multiplayer.IsServer() || Multiplayer.GetRemoteSenderId() != PeerId)
+			return;
+
+		SyncPosition = position;
+		SyncYaw = yaw;
+		SyncPitch = pitch;
+		SyncHoldDistance = Mathf.Clamp(holdDistance, MinHoldDistance, MaxHoldDistance);
+		SelectedSlot = Mathf.Clamp(slot, 0, SlotCount - 1);
+		SelectedItemCharge = Mathf.Clamp(charge, 0f, 1f);
+	}
+
+	/// <summary>Owner: the level is about to be swapped (see Main.ChangeLevel), so stop reporting.</summary>
+	public void StopReporting() => _reporting = false;
 
 	private void FollowNetworkState(float dt)
 	{
@@ -526,7 +576,7 @@ public partial class Player : CharacterBody3D
 		if (spawns.Count == 0)
 			return;
 
-		var spawn = (Node3D)spawns[PeerId % spawns.Count];
+		var spawn = (Node3D)spawns[(SpawnSlot >= 0 ? SpawnSlot : PeerId) % spawns.Count];
 		GlobalPosition = spawn.GlobalPosition;
 		Rotation = new Vector3(0, spawn.GlobalRotation.Y, 0);
 		Velocity = Vector3.Zero;
@@ -554,10 +604,13 @@ public partial class Player : CharacterBody3D
 	}
 
 	// Placeholder "down" pose: lie flat, camera near the floor.
+	// The body collides as it's drawn, lying down, not as an invisible standing pillar. (A downed
+	// player still weighs down a pressure plate.)
 	private void SetDeadVisuals(bool dead)
 	{
 		_bodyMesh.Rotation = dead ? new Vector3(Mathf.Pi / 2f, 0, 0) : Vector3.Zero;
 		_bodyMesh.Position = new Vector3(0, dead ? 0.35f : 0.9f, 0);
+		_bodyShape.Transform = _bodyMesh.Transform;
 		_head.Position = new Vector3(0, dead ? 0.4f : 1.55f, 0);
 		_visor.Visible = !dead;
 	}

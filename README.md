@@ -117,14 +117,18 @@ docs/        Design, decisions, roadmap
 
 ## How the networking works
 
-- **Listen server.** The host is also the server. Only the host loads levels; `LevelSpawner`
-  replicates them to clients, including late joiners.
+- **Listen server, star network.** The host is also the server, and clients only ever talk to the
+  host (never to each other). Only the host loads levels; `LevelSpawner` replicates them to
+  clients, including late joiners.
 - **Players are client-authoritative.** Each client moves its own player, so movement feels
-  instant. The player node is named after its owner's peer id, which is how authority gets
-  assigned. Everyone else smooths toward the replicated position and look direction.
+  instant, and reports where it is to the host 30 times a second; the host passes that on to
+  everyone else, who smooth toward it. The player node is named after its owner's peer id, which
+  is how authority gets assigned.
 - **Props are host-authoritative.** Only the host simulates physics. Clients hold frozen copies
   that follow the host's transform. Grab / release / throw are requests sent to the host, which
-  decides who holds what, so props never desync.
+  decides who holds what. The one exception is the prop you're carrying: your game simulates its
+  own copy (so it has no lag), and the host carries on from where your copy was when you let go.
+- **Level changes wait for clients** to stop reporting, so nothing arrives for a level that's gone.
 - **Transport lives in `core/Network.cs`.** Swapping ENet for Steam (or a relay) happens there,
   without touching gameplay code.
 
@@ -134,10 +138,17 @@ docs/        Design, decisions, roadmap
 `_console.exe` Godot build on Windows so the output shows up:
 
 ```
-godot --headless res://tests/smoke_test.tscn -- --role=scenes   # scenes load; level + combat work offline
-godot --headless res://tests/smoke_test.tscn -- --role=host     # start this first...
-godot --headless res://tests/smoke_test.tscn -- --role=client   # ...then: join, carry, throw, fight, leave
+godot --headless res://tests/smoke_test.tscn -- --role=scenes    # scenes load; level, combat, chambers, a run offline
+godot --headless res://tests/smoke_test.tscn -- --role=network --clients=3 --ping=150 --jitter=20 --loss=2
 ```
+
+The network role hosts and starts its own clients (up to 4; the last one joins mid-run), each
+behind a fake internet connection (`--ping` round trip in ms, `--jitter` ms, `--loss` %; leave them
+out for a perfect connection). They play the sandbox and then a whole maze run: carrying crates,
+buttons, the closet, a revive, the ledge throw, someone leaving while carrying, and a failed run.
+It logs what players would feel (how far carried props trail, grab delay, traffic). Client logs go
+to `--out=<folder>`. To run a host and a client by hand instead: `--role=host`, then `--role=client`
+in a second terminal.
 
 Each prints `SMOKE PASS` or `SMOKE FAIL: ...` and exits 0 / 1.
 

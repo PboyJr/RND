@@ -58,7 +58,8 @@ about carrying physics objects.
 **Decision:**
 - **Players are client-authoritative.** Each client moves its own player, so movement feels
   instant, and the synchronizer replicates it. Remote players smooth toward the replicated state and
-  snap if more than 3 m off.
+  snap if more than 3 m off. (Updated 2026-09-25: the client now reports its state to the host,
+  which replicates it; see "Player state goes through the host".)
   - The player node is **named after its owner's peer id**. Authority is set from the name in
     `_EnterTree`.
 - **Props are host-authoritative.** Only the host simulates physics. Clients hold **frozen
@@ -115,7 +116,8 @@ the level spawned by the host avoids that race.
 
 **Decision:** `game/tests/smoke_test.tscn` runs headless in three roles: `scenes` (every scene
 loads and the level plays offline), `host` and `client` (real ENet session: join, grab, throw,
-leave). Commands are in the README.
+leave). Commands are in the README. (2026-09-25: `network` now runs the host and its clients in
+one command, over a fake bad connection; see "The network test plays a whole maze run".)
 
 **Why:** we can't click through the game on every change, and networking bugs hide until a second
 player shows up.
@@ -621,14 +623,123 @@ reach the start, the exit is shut). It solves the new two with props, including 
 real throw's speed from the exit door onto the ledge button. It checks that a 2-chamber run is the
 easiest chamber, then the hardest.
 
+## 2026-09-25: The network test plays a whole maze run, over a fake bad connection
+
+**Decision:** `--role=network` (in `tests/smoke_test.gd`, the suite is `tests/net_suite.gd`) hosts
+and starts its own clients (up to 4; with 2 or more, the last joins mid-run). They play the sandbox
+and then a whole maze run the way players would: they walk (colliding with doors), carry crates onto
+the plate one at a time, hold a button door open, fetch the case from the closet, go down and get
+revived, lob a jar onto the ledge button, and at the end one leaves while carrying a crate and the
+rest go down to fail the run. They meet at barriers on the host, ask it for host-only things, and
+send it their results, so the host's exit code covers everyone. `--ping` (round trip, ms),
+`--jitter` and `--loss` (%) put each client behind `tests/lag_proxy.gd`, a UDP relay on a thread
+that holds packets back and drops some. It also measures what a player would feel: how far a
+carried prop trails the hold point, how long a grab takes, the late joiner's clock, and traffic.
+The old `host` / `client` roles still work by hand (one client, no late join).
+
+**Why:** every network test ran on one machine with no delay, and the maze run had never been
+played over the network at all. This found nine real bugs in its first day (the entries below).
+
+**Passing configurations:** 1 client with no lag; 3 clients at 150 ms / 20 ms jitter / 2% loss; 4
+clients at 250 ms / 40 ms jitter / 5% loss.
+
+## 2026-09-25: Player state goes through the host; clients never talk to each other
+
+**Decision:**
+- Each client sends its own player's state (position, look, hold distance, slot, flask charge) to
+  the host 30 times a second (`Player.ReportState`, unreliable-ordered). The host copies it into
+  the player's `Sync*` properties, and the player's synchronizer (now **host-owned**, rooted on
+  itself, 30 Hz) sends it on to everyone else. A visibility filter keeps it from going back to the
+  owner, so nothing the owner controls (slot, hold distance) is overwritten by an older copy.
+- The synchronizer is rooted on its own node, not the player: a spawned node's synchronizer
+  visibility also decides whether that node is spawned for a peer, and hiding the player from its
+  owner would stop the owner getting its own player.
+- **Server relay is off** (`SceneMultiplayer.ServerRelay = false`, set in `Network`): a star
+  network. Clients only hear from the host, and don't learn about each other.
+
+**Why:** with client-owned synchronizers, every client sent its state to everyone (relayed by the
+host). State in flight for a player that had just been removed (level changes) or not yet created
+(late joiners) gave dozens of engine errors per transition at 150 ms. With the relay on, two
+clients leaving in the same frame made the host tell one about the other after ENet had already
+dropped it (another engine error). Same latency as before, since relayed traffic went through the
+host anyway.
+
+## 2026-09-25: Level changes wait for clients to stop reporting
+
+**Decision:** `Main.ChangeLevel` (host) first sends `LevelEnding`; each client stops reporting its
+player and confirms; the host swaps once everyone has (or after 1 s). The request, the reports and
+the confirmation all use `Network.StateChannel` (transfer channel 1): on one channel, reliable and
+unreliable messages stay in order with each other, so no report sent before the confirmation can
+arrive after it. (On channel 0 they take separate routes.) `Main.ChangingLevel` is true meanwhile;
+`MazeRun` waits for it.
+
+**Why:** a report still on its way when the host freed the level arrived for a player that no
+longer existed. And while the swap waits, the old chamber (already passed) is still loaded: the run
+counted it as passed again and skipped the next chamber. The network test caught both.
+
+## 2026-09-25: The prop you carry is simulated on your own machine
+
+**Decision:** a client carrying a prop unfreezes its own copy and runs the same carry spring on it,
+toward its own (lag-free) hold point, so the prop hangs where you hold it. When you let go or throw,
+your copy stops being pulled at once (and, for a throw, flies off at once), and the host is sent
+your copy's position and velocity (`PhysicsProp.RequestLetGo`). The host takes them over if they're
+within 2 m of where it has the prop, so the prop goes where you saw it go. Your copy keeps
+simulating until it has come to rest where the host has it too (or 4 s), then goes back to being
+a frozen copy of the host's. Everyone else still sees the host's copy.
+Also: the host pulls a client's prop toward that client's latest *reported* hold point, not the
+smoothed body it draws (which trails it), and a held prop can't fall asleep (a sleeping body stops
+being pulled).
+
+**Why:** the host simulated every prop, so a client's carried prop lagged a full round trip plus
+two lots of smoothing: it trailed the hold point by about 1 m on a perfect connection and 2–2.9 m
+at 150 ms, and the host drops a prop that falls 3 m behind. Now it trails by the carry spring alone:
+0.5 m on average while walking, at any ping, and drops land within a few centimetres of where the
+holder let go.
+
+**Trade-offs:** your copy collides with frozen copies of other props, which don't budge, so while
+carrying it can snag on something that moves on the host; the host takes over your version on
+release. Grabbing still waits a round trip (200 ms at 150 ms ping): the host has to agree you got it.
+
+## 2026-09-25: Leaving says goodbye, and silent peers are dropped after 6 s
+
+**Decision:** `Network.EndSession` disconnects gracefully (`PeerDisconnectLater`: acknowledged,
+after anything still queued) and keeps polling the old connection for up to 1 s while the rest of
+the game has already moved on (`Network.IsClosing`). Both sides set ENet's timeout to 2–6 s
+(default 30 s).
+
+**Why:** closing outright sends one unacknowledged packet; when it was lost, the host only noticed
+the player had gone when they timed out, 30 s later, and their frozen player kept holding whatever
+it carried.
+
+## 2026-09-25: Smaller network fixes the test found
+
+- **Spawn points are handed out by the host** (`Level.AddPlayer`, the first free slot, through the
+  player spawner's spawn function so every peer builds the player with its `SpawnSlot`). Clients
+  used to pick `peer id mod 6`: a 72% chance that two of four players start on top of each other.
+- **Reach checks use the latest report** (`Player.EyePosition` for someone else's player): throws,
+  grabs, buttons, filters and revives. At high ping the host refused actions the player really was
+  close enough for.
+- **One held prop per player is enforced by the host** (`RequestGrab`), not just the client.
+- **The chamber clock and "test complete" are replicated** from the host (a synchronizer on
+  `Exit`, 10 Hz), so late joiners see the right time and result. Each peer used to start its own
+  clock when it loaded the chamber.
+
+## 2026-09-25: Players pass through each other; downed players lie down
+
+**Decision:** players don't collide with other players (`collision_mask` 13: world, props,
+entities). They still count for plates, the exit, doors and enemies. A downed player's collision
+shape lies down with the body (it was an invisible 1.8 m pillar), so it still weighs down a plate.
+
+**Why:** at internet ping, everyone bumps into where the others were a moment ago, and in the
+network test the physics pushing two overlapping players apart shoved one through the floor. Being
+able to block or stand on teammates can come back later as a deliberate mechanic.
+
 ## Known limitations / tech debt
 
 Things the prototype does on purpose that we'll need to revisit:
 
 - Props sync position every tick even when asleep. Fine for a few dozen props; optimise later
   (sleep-aware sync, lower rate).
-- The "one held prop per player" rule is only enforced on the client.
-- Clients pick their own spawn point (peer id mod spawn count), so two players can pick the same one.
 - Name labels show peer ids. Real names come with Steam.
 - Walking into props doesn't push them (clients see frozen copies). Grabbing is the only way to
   move them.
@@ -674,27 +785,24 @@ Things the prototype does on purpose that we'll need to revisit:
 - Rebuilding the C# code or reimporting assets from the command line while the Godot editor is
   open can leave the editor running stale state (seen 2026-09-25: the evil guy saw you but never
   left his spawn). Close Godot fully and reopen the project.
-- Maze chamber clocks start when each peer loads the chamber, and "test complete" is a one-off RPC,
-  so a late joiner's clock is off and they never see the test as passed. Sync the chamber state
-  once chambers chain into a maze.
-- Passing a chamber doesn't lead anywhere yet: there's one chamber and no next one.
 - The evil guy walking through an open door is only checked as "a path exists", not by watching
   him walk it (drop links work the same way and he walks those).
 - Standing at a shut door is all he does about it: he doesn't wait for it to open, or look for
   another way round, unless the search takes him there.
-- Plates, buttons and doors are only smoke-tested offline. `Pressed` replicates like any other
-  synced property, but the network roles still run on the test level, not the chamber.
 - Doors and buttons have no sounds of their own (both reuse `Impact`), no ticking while a button
   runs down, and doors have no visible frame or track.
 - Each peer runs its own door, so a jam can differ slightly between peers for a moment: the
   host's crate is in the doorway before the client's copy of it is. It settles once the crate stops.
 - The acid flask can't press a button (it's a projectile, not a `PhysicsProp`).
-- A maze run over the network (changing chambers mid-session) isn't smoke-tested: the network
-  roles still play the test level. Offline, a whole run (pass, restart, fail) is tested, and so is
-  a revive over the network.
 - The hold-[E] revive (aiming, progress) isn't tested; the test sends `RequestRevive` directly.
-- The run picks chambers at random from a pool of one, and restarts on its own after the result
-  screen (no lobby, no reward yet).
+  The network test walks and carries by moving the player directly (headless has no mouse capture,
+  so the real input path isn't driven).
+- The run restarts on its own after the result screen (no lobby, no reward yet).
+- Traffic, measured by the network test: each client downloads about 16 KB/s (130 kbit/s) and
+  uploads about 2 KB/s, so the host uploads about 16 KB/s per client (a 6-player host: ~80 KB/s).
+  Most of it is props, synced 30 times a second even when asleep.
+- The network test plays at most 4 clients: two lanes, two rows through the 3 m corridors. 6-player
+  sessions (5 clients) aren't tested.
 - Telling mental from physical drops on clients relies on the health synchronizer sending `Mental`
   and `Current` in the same update, `Mental` first. If a drop ever mixes both in one update, only
   the physical part counts as a hit, which is right; if they ever arrive in separate updates, a

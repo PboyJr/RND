@@ -140,14 +140,16 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>Working on now</h2>
 	<div class="now">
 		<p class="label">In progress · 25 Sep 2026</p>
-		<p><strong>More test chambers for the maze run.</strong> A run used to be the same room three times. There are now three chambers, and a run plays them from easiest to hardest:</p>
+		<p><strong>The big push: the hurdles we'd been putting off.</strong> Six jobs, in this order:</p>
 		<ol>
-			<li><strong>Crates.</strong> The exit opens while its plate is held down, and there's no heavy case this time. Four crates side by side are heavy enough; a jar or three crates aren't.</li>
-			<li><strong>The closet.</strong> The first chamber we built: the heavy case is shut in a closet behind a button door.</li>
-			<li><strong>Ledge.</strong> The exit needs its plate held <em>and</em> a button pressed that sits on a ledge <span class="num">3.5 m</span> up, out of reach. Hit it with a thrown jar, then everyone has <span class="num">5 s</span> to get through, or you jam the door open with a crate.</li>
+			<li><strong>Playing over a bad connection.</strong> <em>Done.</em> The game now gets tested with five players on a simulated bad internet connection (a quarter-second of lag, some messages lost, one player joining halfway through and one leaving while carrying something). That found and fixed nine real problems. The biggest: when you weren't the host, anything you carried trailed up to three metres behind you and could drop out of your hands. Now it moves instantly on your screen, whatever your connection.</li>
+			<li><strong>A version anyone can download and run</strong>, built automatically, plus a settings menu (mouse sensitivity, volume, fullscreen, graphics). <em>Next.</em></li>
+			<li><strong>Rewards:</strong> a finished maze run pays out, and it's saved.</li>
+			<li><strong>A smarter evil guy:</strong> works out who made a noise, waits at shut doors or finds another way round, and several of them share what they notice.</li>
+			<li><strong>Mazes put together from rooms</strong>, so no two runs are the same.</li>
+			<li><strong>Steam:</strong> play with friends over the internet.</li>
 		</ol>
-		<p><strong>Still to do here:</strong> playtest the new chambers (can you spot the ledge button, and hit it?), build more chambers so runs vary, and later start the difficulty from the party's level.</p>
-		<p><strong>Then:</strong> the rest of the maze run. A finished run pays out a reward, and you get somewhere to spend it between runs.</p>
+		<p><strong>Also still to do:</strong> playtest the three test chambers (can you spot the ledge button, and hit it?).</p>
 	</div>
 </section>
 
@@ -205,7 +207,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 
 <section id="today">
 	<h2>What's playable today</h2>
-	<p>Two ways to play, picked by the host in the menu: a dark test room with a creature in it, and a <strong>maze run</strong> through three grey-box test chambers. Up to a few players on the same network.</p>
+	<p>Two ways to play, picked by the host in the menu: a dark test room with a creature in it, and a <strong>maze run</strong> through three grey-box test chambers. Up to six players on the same network; friends can join in the middle of a run.</p>
 	<div class="features">
 		<div>
 			<h3>Carrying</h3>
@@ -213,6 +215,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 				<li>Grab, carry, fling and throw crates, jars and a heavy case</li>
 				<li>Heavy things feel heavy</li>
 				<li>Push and pull what you're holding</li>
+				<li>What you carry moves instantly on your screen, even on a laggy connection, and lands where you dropped it</li>
 			</ul>
 		</div>
 		<div>
@@ -298,6 +301,7 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<tr><td>Health &amp; death</td><td><span class="pill leaning">Leaning</span></td><td>100 health; timed respawn in the test room, teammate revive in the maze</td></tr>
 		<tr><td>Mind vs body damage</td><td><span class="pill leaning">Leaning</span></td><td>One health pool; mind damage can't kill you</td></tr>
 		<tr><td>Characters that rust</td><td><span class="pill leaning">Leaning</span></td><td>Benched characters get worse</td></tr>
+		<tr><td>Walking through teammates</td><td><span class="pill leaning">Leaning</span></td><td>Online, bumping into friends means bumping into where they were a moment ago, so you pass through them. A downed teammate still weighs down a plate</td></tr>
 		<tr><td>Rat lore</td><td><span class="pill idea">Idea</span></td><td>You are a rat with a human brain</td></tr>
 		<tr><td>Game modes</td><td><span class="pill idea">Idea</span></td><td>Retrieval, maze, payload, research. The maze is being built first</td></tr>
 		<tr><td>Selling</td><td><span class="pill open">Open</span></td><td>Does selling stay at all? The black market idea is on hold</td></tr>
@@ -370,7 +374,9 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 		<li>Sounds are placeholders, tuned by numbers rather than by ear.</li>
 		<li>Finishing a maze run earns nothing yet: after the result screen, a new run starts.</li>
 		<li>Every run plays the same three chambers in the same order, and the two new ones haven't been playtested.</li>
-		<li>The chamber's plates, buttons and doors haven't been tested with several players yet, and they don't have their own sounds.</li>
+		<li>The chamber's plates, buttons and doors don't have their own sounds yet.</li>
+		<li>You walk straight through your teammates. That's deliberate (see the table above).</li>
+		<li>Grabbing something takes a moment on a laggy connection, because the host has to agree you got it first.</li>
 		<li>If the game acts strangely right after pulling new code, close Godot completely and reopen it.</li>
 	</ul>
 </section>
@@ -379,11 +385,11 @@ footer { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line)
 	<h2>How it's built</h2>
 	<ul>
 		<li><strong>Godot 4.7 (.NET edition) with C#.</strong> Everyone must use the same Godot version.</li>
-		<li><strong>One player hosts</strong> and everyone else joins them. No servers to run. The host is in charge of anything shared (props, health, the creature) so nobody's game disagrees; your own movement is handled on your machine so it feels instant.</li>
+		<li><strong>One player hosts</strong> and everyone else joins them. No servers to run. The host is in charge of anything shared (props, health, the creature) so nobody's game disagrees; your own movement, and whatever you're carrying, is handled on your machine so it feels instant.</li>
 		<li><strong>Jolt physics</strong>, because stacking and carrying is the heart of the game.</li>
 		<li><strong>All sound is generated in code.</strong> There are no audio files yet.</li>
 		<li><strong>Steam, voice chat and our own server</strong> are planned but not chosen.</li>
-		<li><strong>Automated tests</strong> start the game without a window and check that levels load, combat works and two players can connect.</li>
+		<li><strong>Automated tests</strong> start the game without a window and check that levels load and combat works, and have up to five players play a whole maze run together over a simulated bad internet connection.</li>
 	</ul>
 	<p class="muted">Setup steps are in the repo's README.</p>
 </section>

@@ -351,6 +351,20 @@ Players are scientists. Each archetype brings a different kit on the hotbar.
 - `Open`: does death cost money or research? (The upload lore suggests death loses the rat's
   stuff but not your upgrades, see Lore.)
 - Hits flash your body for everyone else. For you, they crack your visor (see below).
+- **A downed player lies on the floor and still weighs something** (2026-09-25): lying on a
+  pressure plate, they hold it down. `Idea`: lean into it (dragging a downed teammate onto a plate
+  to hold a door is grim, funny, and very "they're just test subjects").
+
+### Players and each other (`Leaning`, 2026-09-25)
+
+- **You walk through your teammates.** Over the internet everyone sees the others a moment late,
+  so bumping into each other means bumping into where they *were*, which feels broken (and in
+  testing pushed a player through the floor). Teammates still count for plates, exits, doors and
+  enemies.
+- `Idea`: body-blocking or standing on a teammate's head (boosting up to a ledge) as a deliberate
+  mechanic later, if a puzzle wants it.
+- **What you carry feels instant**, whatever your ping: your own game moves it, and when you let
+  go it lands where you saw it land.
 
 ### The gas mask HUD (`Decided`)
 

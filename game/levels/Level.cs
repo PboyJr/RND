@@ -32,6 +32,7 @@ public partial class Level : Node3D
 	public Effects Effects { get; private set; }
 
 	private Node3D _players;
+	private MultiplayerSpawner _playerSpawner;
 	private Node3D _enemies;
 	private Node3D _projectiles;
 	private bool _spawningPlayers;
@@ -43,6 +44,8 @@ public partial class Level : Node3D
 	public override void _Ready()
 	{
 		_players = GetNode<Node3D>("Players");
+		_playerSpawner = GetNode<MultiplayerSpawner>("PlayerSpawner");
+		_playerSpawner.SpawnFunction = Callable.From<Variant, Node>(CreatePlayer); // every peer builds its copy this way
 		_enemies = GetNode<Node3D>("Enemies");
 		_projectiles = GetNode<Node3D>("Projectiles");
 		Effects = GetNode<Effects>("Effects");
@@ -127,14 +130,25 @@ public partial class Level : Node3D
 
 	private void OnPeerDisconnected(long peerId) => _players.GetNodeOrNull(peerId.ToString())?.QueueFree();
 
+	// The host hands out spawn points (the first one nobody has), so no two players start on top of
+	// each other. Late joiners get one that's free.
 	private void AddPlayer(int peerId)
 	{
 		if (_players.HasNode(peerId.ToString()))
 			return;
 
+		var taken = _players.GetChildren().OfType<Player>().Select(p => p.SpawnSlot).ToHashSet();
+		int slot = Enumerable.Range(0, taken.Count + 1).First(s => !taken.Contains(s));
+		_playerSpawner.Spawn(new Godot.Collections.Array { peerId, slot });
+	}
+
+	private Node CreatePlayer(Variant data)
+	{
+		var args = data.AsGodotArray();
 		var player = PlayerScene.Instantiate<Player>();
-		player.Name = peerId.ToString();
-		_players.AddChild(player, forceReadableName: true);
+		player.Name = args[0].ToString();
+		player.SpawnSlot = args[1].AsInt32();
+		return player;
 	}
 
 	private void SpawnEnemy(Node3D point)

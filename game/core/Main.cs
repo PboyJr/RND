@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Linq;
 using Godot;
 using RND.Maze;
+using RND.Players;
 using RND.UI;
 
 namespace RND.Core;
@@ -11,6 +13,8 @@ namespace RND.Core;
 /// </summary>
 public partial class Main : Node
 {
+	private const double SwapTimeout = 1.0; // don't wait longer than this for clients to confirm a level change
+
 	/// <summary>What the host can pick in the menu. The first is the default. Each must also be in LevelSpawner.</summary>
 	[Export] public Godot.Collections.Array<PackedScene> Levels { get; set; } = new();
 
@@ -18,6 +22,16 @@ public partial class Main : Node
 	private MainMenu _menu;
 	private Hud _hud;
 	private MazeRun _run;
+
+	// Host, while a level change waits for clients to stop reporting their players (see ChangeLevel).
+	private PackedScene _nextLevel;
+	private readonly HashSet<long> _unconfirmed = new();
+	private double _swapBy;
+
+	private static double Now => Time.GetTicksMsec() / 1000.0;
+
+	/// <summary>Host: a level change is waiting on clients. The old level is still there until it's done.</summary>
+	public bool ChangingLevel => _nextLevel != null;
 
 	public override void _Ready()
 	{
@@ -30,6 +44,13 @@ public partial class Main : Node
 
 		Network.Instance.SessionStarted += OnSessionStarted;
 		Network.Instance.SessionEnded += OnSessionEnded;
+		Multiplayer.PeerDisconnected += id => _unconfirmed.Remove(id);
+	}
+
+	public override void _Process(double delta)
+	{
+		if (_nextLevel != null && (_unconfirmed.Count == 0 || Now > _swapBy))
+			SwapLevel();
 	}
 
 	private void OnSessionStarted()
@@ -53,16 +74,48 @@ public partial class Main : Node
 	private void OnSessionEnded(string reason)
 	{
 		_run.Stop();
+		_nextLevel = null;
 		ClearLevel();
 		_hud.Close();
 		_menu.Open(reason);
 	}
 
+	/// <summary>
+	/// Host only. Clients report their own player's state to the host all the time; a report still on
+	/// its way when the host removes the level would arrive for a player that no longer exists. So the
+	/// host first asks clients to stop, and swaps once they've all said so (or after a second).
+	/// </summary>
 	public void ChangeLevel(PackedScene level)
 	{
+		_nextLevel = level;
+		_unconfirmed.Clear();
+		if (_levelRoot.GetChildCount() > 0)
+			foreach (int peer in Multiplayer.GetPeers())
+				_unconfirmed.Add(peer);
+		_swapBy = Now + SwapTimeout;
+		if (_unconfirmed.Count > 0)
+			Rpc(MethodName.LevelEnding);
+		else
+			SwapLevel();
+	}
+
+	private void SwapLevel()
+	{
+		PackedScene level = _nextLevel;
+		_nextLevel = null;
 		ClearLevel();
 		_levelRoot.AddChild(level.Instantiate());
 	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable, TransferChannel = Network.StateChannel)]
+	private void LevelEnding()
+	{
+		Player.Local?.StopReporting();
+		RpcId(1, MethodName.LevelEndingConfirmed);
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable, TransferChannel = Network.StateChannel)]
+	private void LevelEndingConfirmed() => _unconfirmed.Remove(Multiplayer.GetRemoteSenderId());
 
 	private void ClearLevel()
 	{
